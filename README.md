@@ -60,7 +60,7 @@ Por padrão o proxy sobe em `0.0.0.0:8080` com autenticação básica habilitada
 Exemplo de teste via curl usando o proxy:
 
 ```bash
-curl --proxy "http://usuario:senha@localhost:8080" "http://httpbin.org/ip"
+curl --proxy "http://usuario:senha@ip_do_server:8080" "http://httpbin.org/ip"
 ```
 
 ### Configuração
@@ -93,7 +93,7 @@ Autenticação básica (HTTP Proxy-Authorization: Basic) é suportada. Quando ha
 Exemplo com `curl` (inclui usuário e senha na URL do proxy):
 
 ```bash
-curl --proxy "http://usuario:senha@localhost:8080" "http://httpbin.org/ip"
+curl --proxy "http://usuario:senha@ip_do_server:8080" "http://httpbin.org/ip"
 ```
 
 ### Logs
