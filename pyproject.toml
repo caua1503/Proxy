@@ -1,0 +1,35 @@
+[project]
+name = "proxy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "ruff>=0.13.1",
+    "taskipy>=1.14.1",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+preview=true
+select = ['I', 'F', 'E', 'W', 'PL', 'PT']
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+disallow_untyped_defs = true
+strict_optional = true
+no_implicit_optional = true
+show_error_codes = true
+pretty = true
+
+[tool.taskipy.tasks]
+
+check = "uv run ruff check . && uv run mypy ."
+lint = "uv run ruff format . && uv run ruff check --fix ."
