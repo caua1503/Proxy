@@ -55,12 +55,12 @@ Execute o servidor:
 python main.py
 ```
 
-Por padrão o proxy sobe em `0.0.0.0:8080` com autenticação básica habilitada (`admin:admin`).
+Por padrão o proxy sobe em `0.0.0.0:8080`.
 
 Exemplo de teste via curl usando o proxy:
 
 ```bash
-curl --proxy "http://usuario:senha@ip_do_server:8080" "http://httpbin.org/ip"
+curl --proxy "http://admin:admin@ip_do_server:8080" "http://httpbin.org/ip"
 ```
 
 ### Configuração
@@ -76,11 +76,16 @@ A configuração principal é feita ao instanciar `core.Proxy` (veja `main.py`):
 Para alterar rapidamente, edite `main.py`:
 
 ```python
-from core import Proxy, ProxyAuth
+from core import Proxy
 
-auth = ProxyAuth(username="admin", password="admin")
-proxy = Proxy(host="0.0.0.0", port=8080, connections=10, production_mode=True, auth=auth)
+proxy = Proxy()
 proxy.run()
+```
+
+Exemplo de teste via curl usando o proxy, apenas instanciando a classe:
+
+```bash
+curl --proxy "http://ip_do_server:8080" "http://httpbin.org/ip"
 ```
 
 ### Autenticação
