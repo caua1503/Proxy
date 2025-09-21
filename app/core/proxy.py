@@ -12,6 +12,7 @@ from utils import (
 )
 
 from .auth import ProxyAuth
+from .firewall import ProxyFirewall
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class Proxy:
         max_connections: int = 5,
         production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
+        firewall: Optional[ProxyFirewall] = None,
     ):
         """
         Proxy server
@@ -45,9 +47,12 @@ class Proxy:
         self.max_connections = max_connections
         self.production_mode = production_mode
         self.auth = auth
-    
+        self.firewall = firewall
+
         if self.backlog < self.max_connections:
-            raise ValueError(f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})")
+            raise ValueError(
+                f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"
+            )
 
     def run(self) -> None:
         logging.info("Starting proxy server...")
@@ -76,6 +81,10 @@ class Proxy:
                         try:
                             client, address = server.accept()
                             logging.debug(f"Accepting connection from ({address[0]}:{address[1]})")
+                            if self.firewall is not None:
+                                if not self.firewall.verify(address[0]):
+                                    logging.info(
+                                        f"Connection refused ({address[0]}:{address[1]}), firewall blocked"
 
                             executor.submit(self.handle_client_request, client, address)
 
@@ -91,7 +100,7 @@ class Proxy:
                     server.close()
 
         except KeyboardInterrupt:
-            logging.info(f"Terminating all open connections")
+            logging.info("Terminating all open connections")
 
     def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:
         logging.debug("Request accepted")
@@ -110,13 +119,13 @@ class Proxy:
 
         try:
             if self.auth is not None:
-                headers = parse_headers_from_request(request)
-                if not self.is_authorized(headers):
-                    logging.info(
                         f"Connection refused ({address[0]}:{address[1]}), reauthentication required"
                     )
                     send_proxy_auth_required(client)
                     return
+                        logging.info(
+                            f"Connection refused ({address[0]}:{address[1]}), reauthentication required"
+                        )
 
             logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
 
