@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Optional
 
 from utils import (
+    ensure_connection_close_header,
     extract_host_port_from_request,
     parse_headers_from_request,
     send_proxy_auth_required,
@@ -25,7 +26,7 @@ class Proxy:
         host: str = "0.0.0.0",
         port: int = 8080,
         backlog: int = 10,
-        max_connections: int = 5,
+        max_connections: int = 50,
         production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
@@ -109,6 +110,12 @@ class Proxy:
     def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:
         logging.debug("Request accepted")
 
+        # Avoid hanging threads on slow clients
+        try:
+            client.settimeout(15)
+        except Exception:
+            pass
+
         request = b""
         while b"\r\n\r\n" not in request:
             try:
@@ -123,32 +130,73 @@ class Proxy:
 
         try:
             if self.auth is not None:
-                        f"Connection refused ({address[0]}:{address[1]}), reauthentication required"
-                    )
-                    send_proxy_auth_required(client)
-                    return
+                if self.firewall is not None and self.firewall.is_no_auth_required(address[0]):
+                    pass
+                else:
+                    headers = parse_headers_from_request(request)
+                    if not self.is_authorized(headers):
                         logging.info(
                             f"Connection refused ({address[0]}:{address[1]}), reauthentication required"
                         )
+                        send_proxy_auth_required(client)
+                        return
 
             logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
+
+            # Parse headers for Content-Length
+            headers_all = parse_headers_from_request(request)
+            content_length = 0
+            try:
+                if "Content-Length" in headers_all:
+                    content_length = int(headers_all.get("Content-Length", "0") or "0")
+            except Exception:
+                content_length = 0
 
             host, port = extract_host_port_from_request(request)
             destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             destination_socket.connect((host, port))
+            try:
+                destination_socket.settimeout(15)
+            except Exception:
+                pass
 
             forward_request = strip_proxy_authorization_header(request)
+            forward_request = ensure_connection_close_header(forward_request)
 
-            destination_socket.sendall(forward_request)
+            # If there is a body, ensure we forward it entirely based on Content-Length
+            header_part, sep, body_initial = forward_request.partition(b"\r\n\r\n")
+            sent_all = False
+            if sep:
+                # Send header + whatever body bytes we already have
+                destination_socket.sendall(header_part + sep + body_initial)
+
+                initial_body_len = len(body_initial)
+                remaining = max(0, content_length - initial_body_len)
+
+                while remaining > 0:
+                    chunk = client.recv(min(4096, remaining))
+                    if not chunk:
+                        break
+                    destination_socket.sendall(chunk)
+                    remaining -= len(chunk)
+                sent_all = True
+
+            if not sent_all:
+                # Fallback: send all as-is
+                destination_socket.sendall(forward_request)
 
             logging.debug("Received response from destination:")
 
             while True:
-                data = destination_socket.recv(1024)
-                if not data:
+                try:
+                    data = destination_socket.recv(4096)
+                    if not data:
+                        break
+                    logging.debug(f"response: {data.decode('utf-8', errors='replace')}")
+                    client.sendall(data)
+                except socket.timeout:
+                    # Assume end of response on inactivity
                     break
-                logging.debug(f"response: {data.decode('utf-8', errors='replace')}")
-                client.sendall(data)
 
             destination_socket.close()
         except Exception as e:

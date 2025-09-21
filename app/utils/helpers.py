@@ -60,3 +60,42 @@ def strip_proxy_authorization_header(request: bytes) -> bytes:
         return b"\r\n".join(filtered) + sep + body
     except Exception:
         return request
+
+
+def ensure_connection_close_header(request: bytes) -> bytes:
+    """
+    Ensure the outgoing request uses Connection: close and removes Proxy-Connection.
+
+    - Sets/overrides `Connection: close`
+    - Removes `Proxy-Connection`
+    """
+    try:
+        header_part, sep, body = request.partition(b"\r\n\r\n")
+        if not sep:
+            return request
+
+        lines = header_part.split(b"\r\n")
+        if not lines:
+            return request
+
+        request_line = lines[0]
+
+        new_headers: list[bytes] = []
+        has_connection = False
+
+        for line in lines[1:]:
+            lower = line.lower()
+            if lower.startswith(b"proxy-connection:"):
+                continue
+            if lower.startswith(b"connection:"):
+                has_connection = True
+                continue
+            new_headers.append(line)
+
+        # Force Connection: close
+        new_headers.append(b"Connection: close")
+
+        rebuilt = b"\r\n".join([request_line] + new_headers) + sep + body
+        return rebuilt
+    except Exception:
+        return request
