@@ -85,6 +85,10 @@ class Proxy:
                                 if not self.firewall.verify(address[0]):
                                     logging.info(
                                         f"Connection refused ({address[0]}:{address[1]}), firewall blocked"
+                                    )
+                                    client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                                    client.close()
+                                    continue
 
                             executor.submit(self.handle_client_request, client, address)
 
