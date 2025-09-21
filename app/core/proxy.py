@@ -2,7 +2,6 @@ import base64
 import logging
 import socket
 from concurrent.futures import ThreadPoolExecutor
-from socket import socket as SocketType
 from typing import Dict, Optional
 
 from utils import (
@@ -94,7 +93,7 @@ class Proxy:
         except KeyboardInterrupt:
             logging.info(f"Terminating all open connections")
 
-    def handle_client_request(self, client: SocketType, address: tuple[str, int]) -> None:
+    def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:
         logging.debug("Request accepted")
 
         request = b""

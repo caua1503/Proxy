@@ -1,4 +1,4 @@
-from socket import socket as SocketType
+import socket
 from typing import Dict
 
 
@@ -36,7 +36,7 @@ def parse_headers_from_request(request: bytes) -> Dict[str, str]:
         return {}
 
 
-def send_proxy_auth_required(client: SocketType) -> None:
+def send_proxy_auth_required(client: socket.socket) -> None:
     body = b"Proxy Authentication Required"
     response = (
         b"HTTP/1.1 407 Proxy Authentication Required\r\n"
