@@ -25,8 +25,8 @@ class Proxy:
         self,
         host: str = "0.0.0.0",
         port: int = 8080,
-        backlog: int = 10,
-        max_connections: int = 50,
+        backlog: int = 20,
+        max_connections: int = 20,
         production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
@@ -51,7 +51,7 @@ class Proxy:
         self.firewall = firewall
 
         if self.backlog < self.max_connections:
-            raise ValueError(
+            logging.warning(
                 f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
 
