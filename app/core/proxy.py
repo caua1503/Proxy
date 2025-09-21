@@ -12,31 +12,11 @@ from utils import (
     strip_proxy_authorization_header,
 )
 
+from .auth import ProxyAuth
+
 logger = logging.getLogger(__name__)
 
 # logging.basicConfig()
-
-
-class ProxyAuth:
-    """
-    Proxy authentication
-    """
-
-    def __init__(self, username: str, password: str):
-        self.username = username
-        self.password = password
-
-    def authenticate(self, username: str, password: str) -> bool:
-        """
-        Authenticate the user and password
-        """
-        if not username or not password:
-            return False
-
-        if self.username == username and self.password == password:
-            return True
-        else:
-            return False
 
 
 class Proxy:
