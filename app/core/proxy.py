@@ -31,6 +31,14 @@ class Proxy:
     ):
         """
         Proxy server
+
+        args:
+            host (str): host to bind
+            port (int): port to listen
+            backlog (int): backlog of connections simultaneous
+            max_connections (int): maximum number of requests processed simultaneously
+            production_mode (bool): production mode
+            auth (ProxyAuth): authentication class
         """
         self.host = host
         self.port = port
@@ -51,10 +59,13 @@ class Proxy:
             logging.critical(f"Error starting proxy server ({str(e)})")
             return
 
-        logging.info(f"Proxy server started ({self.host}:{self.port})")
+        logging.info(f"Proxy server started (http://{self.host}:{self.port})")
         logging.info(
             f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
         )
+
+        if not self.production_mode:
+            logging.info("To stop the server use (Ctrl+C)\n")
 
         with ThreadPoolExecutor(max_workers=self.max_connections) as executor:
             try:
