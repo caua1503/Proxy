@@ -69,9 +69,11 @@ A configuração principal é feita ao instanciar `core.Proxy` (veja `main.py`):
 
 - `host` (str): endereço de bind. Padrão: `0.0.0.0`
 - `port` (int): porta de escuta. Padrão: `8080`
-- `connections` (int): backlog de conexões simultâneas. Padrão: `10`
-- `production_mode` (bool): quando `False`, usa timeout para facilitar debug. Padrão: `True`
+- `backlog` (int): tamanho da fila de conexões pendentes no `listen()`. Padrão: `20`
+- `max_connections` (int): máximo de requisições processadas em paralelo (pool de threads). Padrão: `20`
+- `production_mode` (bool): quando `False`, usa timeouts curtos para facilitar debug. Padrão: `True`
 - `auth` (`ProxyAuth | None`): autenticação básica. Quando `None`, desabilita auth.
+- `firewall` (`ProxyFirewall | None`): regras de allowlist/blocklist e `no_auth_required`.
 
 Para alterar rapidamente, edite `main.py`:
 
@@ -86,6 +88,19 @@ Exemplo de teste via curl usando o proxy, apenas instanciando a classe:
 
 ```bash
 curl --proxy "http://ip_do_server:8080" "http://httpbin.org/ip"
+```
+
+#### Concorrência e desempenho
+
+- `backlog` controla apenas a fila de conexões ainda não aceitas (antes do `accept()`).
+- `max_connections` controla quantas requisições são atendidas simultaneamente.
+- Recomenda-se configurar `backlog >= max_connections` para cenários com bursts/picos, mas não é obrigatório. Em máquinas com pouca carga, valores menores podem ser suficientes.
+
+Exemplos:
+
+```python
+Proxy(backlog=50, max_connections=50)
+Proxy(backlog=15, max_connections=10)
 ```
 
 ### Autenticação
@@ -117,9 +132,15 @@ Os logs usam o módulo `logging` do Python. Níveis:
 ### Roadmap
 
 - [ ] Suporte a HTTPS CONNECT
-- [ ] Regras de bloqueio/allowlist
+- [x] Regras de bloqueio/allowlist
 - [ ] Métricas e healthcheck
 
 ### Referências
 
 - Bright Data — Python Proxy Server: [link](https://brightdata.com.br/blog/proxies-101/python-proxy-server)
+
+### Mais informações
+
+- [Detalhes do Proxy](docs/proxy.md)
+- [Autenticação](docs/auth.md)
+- [Firewall](docs/firewall.md)
