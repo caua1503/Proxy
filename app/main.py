@@ -9,6 +9,6 @@ logging.basicConfig(
 )
 auth = ProxyAuth(username="admin", password="admin")
 
-proxy = Proxy(auth=auth)  # production_mode=False
+proxy = Proxy(auth=auth, production_mode=False)  # production_mode=False
 
 proxy.run()

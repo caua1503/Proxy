@@ -1,7 +1,7 @@
 import base64
 import logging
 import socket
-import threading
+from concurrent.futures import ThreadPoolExecutor
 from socket import socket as SocketType
 from typing import Dict, Optional
 
@@ -44,7 +44,8 @@ class Proxy:
         self,
         host: str = "0.0.0.0",
         port: int = 8080,
-        connections: int = 10,
+        backlog: int = 10,
+        max_connections: int = 5,
         production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
     ):
@@ -53,17 +54,17 @@ class Proxy:
         """
         self.host = host
         self.port = port
-        self.connections = connections
+        self.backlog = backlog
+        self.max_connections = max_connections
         self.production_mode = production_mode
         self.auth = auth
 
     def run(self) -> None:
         logging.info("Starting proxy server...")
-        threads = []
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.bind((self.host, self.port))
-            server.listen(self.connections)
+            server.listen(self.backlog)
             if not self.production_mode:
                 server.settimeout(1.0)
         except Exception as e:
@@ -71,36 +72,28 @@ class Proxy:
             return
 
         logging.info(f"Proxy server started ({self.host}:{self.port})")
-        logging.info(f"Accepting ({self.connections}) simultaneous connections")
+        logging.info(
+            f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
+        )
 
-        try:
-            while True:
-                try:
-                    client, address = server.accept()
-                    logging.debug(f"Accepting connection from ({address[0]}:{address[1]})")
+        with ThreadPoolExecutor(max_workers=self.max_connections) as executor:
+            try:
+                while True:
+                    try:
+                        client, address = server.accept()
+                        logging.debug(f"Accepting connection from ({address[0]}:{address[1]})")
 
-                    thread_client = threading.Thread(
-                        target=self.handle_client_request,
-                        args=(
-                            client,
-                            address,
-                        ),
-                    )
-                    thread_client.start()
-                    threads.append(thread_client)
-                    threads = [t for t in threads if t.is_alive()]
+                        executor.submit(self.handle_client_request, client, address)
 
-                except socket.timeout:
-                    if not self.production_mode:
-                        continue
-                    else:
-                        raise
-        except KeyboardInterrupt:
-            logging.info("Proxy server stopped by Ctrl+C. Ending...")
-        finally:
-            server.close()
-            for t in threads:
-                t.join()
+                    except socket.timeout:
+                        if not self.production_mode:
+                            continue
+                        else:
+                            raise
+            except KeyboardInterrupt:
+                logging.info("Proxy server stopped by Ctrl+C. Ending...")
+            finally:
+                server.close()
 
     def handle_client_request(self, client: SocketType, address: tuple[str, int]) -> None:
         logging.debug("Request accepted")
