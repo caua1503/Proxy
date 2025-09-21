@@ -81,14 +81,12 @@ def ensure_connection_close_header(request: bytes) -> bytes:
         request_line = lines[0]
 
         new_headers: list[bytes] = []
-        has_connection = False
 
         for line in lines[1:]:
             lower = line.lower()
             if lower.startswith(b"proxy-connection:"):
                 continue
             if lower.startswith(b"connection:"):
-                has_connection = True
                 continue
             new_headers.append(line)
 

@@ -52,7 +52,7 @@ class Proxy:
 
         if self.backlog < self.max_connections:
             raise ValueError(
-                f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"
+                f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
 
     def run(self) -> None:
@@ -75,7 +75,7 @@ class Proxy:
         if not self.production_mode:
             logging.info("To stop the server use (Ctrl+C)\n")
 
-        try:
+        try:  # noqa: PLR1702
             with ThreadPoolExecutor(max_workers=self.max_connections) as executor:
                 try:
                     while True:
@@ -85,7 +85,7 @@ class Proxy:
                             if self.firewall is not None:
                                 if not self.firewall.verify(address[0]):
                                     logging.info(
-                                        f"Connection refused ({address[0]}:{address[1]}), firewall blocked"
+                                        f"Connection refused ({address[0]}:{address[1]}), firewall blocked"  # noqa: E501
                                     )
                                     client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
                                     client.close()
@@ -107,10 +107,9 @@ class Proxy:
         except KeyboardInterrupt:
             logging.info("Terminating all open connections")
 
-    def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:
+    def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:  # noqa: PLR0914, PLR0915, PLR0912
         logging.debug("Request accepted")
 
-        # Avoid hanging threads on slow clients
         try:
             client.settimeout(15)
         except Exception:
@@ -136,7 +135,7 @@ class Proxy:
                     headers = parse_headers_from_request(request)
                     if not self.is_authorized(headers):
                         logging.info(
-                            f"Connection refused ({address[0]}:{address[1]}), reauthentication required"
+                            f"Connection refused ({address[0]}:{address[1]}), reauthentication required"  # noqa: E501
                         )
                         send_proxy_auth_required(client)
                         return
