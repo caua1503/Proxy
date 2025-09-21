@@ -46,6 +46,9 @@ class Proxy:
         self.max_connections = max_connections
         self.production_mode = production_mode
         self.auth = auth
+    
+        if self.backlog < self.max_connections:
+            raise ValueError(f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})")
 
     def run(self) -> None:
         logging.info("Starting proxy server...")
@@ -67,24 +70,29 @@ class Proxy:
         if not self.production_mode:
             logging.info("To stop the server use (Ctrl+C)\n")
 
-        with ThreadPoolExecutor(max_workers=self.max_connections) as executor:
-            try:
-                while True:
-                    try:
-                        client, address = server.accept()
-                        logging.debug(f"Accepting connection from ({address[0]}:{address[1]})")
+        try:
+            with ThreadPoolExecutor(max_workers=self.max_connections) as executor:
+                try:
+                    while True:
+                        try:
+                            client, address = server.accept()
+                            logging.debug(f"Accepting connection from ({address[0]}:{address[1]})")
 
-                        executor.submit(self.handle_client_request, client, address)
+                            executor.submit(self.handle_client_request, client, address)
 
-                    except socket.timeout:
-                        if not self.production_mode:
-                            continue
-                        else:
-                            raise
-            except KeyboardInterrupt:
-                logging.info("Proxy server stopped by Ctrl+C. Ending...")
-            finally:
-                server.close()
+                        except socket.timeout:
+                            if not self.production_mode:
+                                continue
+                            else:
+                                raise
+                except KeyboardInterrupt:
+                    logging.info("Proxy server stopped by Ctrl+C. Ending...")
+                    logging.info("Wait until all open connections are closed...")
+                finally:
+                    server.close()
+
+        except KeyboardInterrupt:
+            logging.info(f"Terminating all open connections")
 
     def handle_client_request(self, client: SocketType, address: tuple[str, int]) -> None:
         logging.debug("Request accepted")
