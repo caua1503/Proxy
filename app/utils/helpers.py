@@ -97,3 +97,14 @@ def ensure_connection_close_header(request: bytes) -> bytes:
         return rebuilt
     except Exception:
         return request
+
+
+def get_method_and_target_from_request(request: bytes) -> tuple[str, str]:
+    try:
+        request_line = request.split(b"\r\n", 1)[0].decode("utf-8", errors="replace")
+        parts = request_line.split(" ")
+        method = parts[0].upper() if parts else ""
+        target = parts[1] if len(parts) > 1 else ""
+        return method, target
+    except Exception:
+        return "", ""

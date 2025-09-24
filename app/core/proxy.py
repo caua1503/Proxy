@@ -1,5 +1,6 @@
 import base64
 import logging
+import select
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Optional
@@ -7,6 +8,7 @@ from typing import Dict, Optional
 from utils import (
     ensure_connection_close_header,
     extract_host_port_from_request,
+    get_method_and_target_from_request,
     parse_headers_from_request,
     send_proxy_auth_required,
     strip_proxy_authorization_header,
@@ -24,12 +26,13 @@ class Proxy:
     def __init__(
         self,
         host: str = "0.0.0.0",
-        port: int = 8080,
+        port: int = 8888,
         backlog: int = 20,
         max_connections: int = 20,
         production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
+        timeout: int = 15,
     ):
         """
         Proxy server
@@ -41,6 +44,8 @@ class Proxy:
             max_connections (int): maximum number of requests processed simultaneously
             production_mode (bool): production mode
             auth (ProxyAuth): authentication class
+            timeout (int): timeout for the connection
+
         """
         self.host = host
         self.port = port
@@ -49,6 +54,7 @@ class Proxy:
         self.production_mode = production_mode
         self.auth = auth
         self.firewall = firewall
+        self.timeout = timeout
 
         if self.backlog < self.max_connections:
             logging.warning(
@@ -111,7 +117,7 @@ class Proxy:
         logging.debug("Request accepted")
 
         try:
-            client.settimeout(15)
+            client.settimeout(self.timeout)
         except Exception:
             pass
 
@@ -140,9 +146,28 @@ class Proxy:
                         send_proxy_auth_required(client)
                         return
 
+            method, target = get_method_and_target_from_request(request)
+
+            if method == "CONNECT":
+                host, _, port_str = target.partition(":")
+                try:
+                    port = int(port_str) if port_str else 443
+                except Exception:
+                    port = 443
+
+                destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                destination_socket.connect((host, port))
+                try:
+                    destination_socket.settimeout(self.timeout)
+                except Exception:
+                    pass
+
+                client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                self._tunnel(client, destination_socket)
+                return
+
             logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
 
-            # Parse headers for Content-Length
             headers_all = parse_headers_from_request(request)
             content_length = 0
             try:
@@ -155,7 +180,7 @@ class Proxy:
             destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             destination_socket.connect((host, port))
             try:
-                destination_socket.settimeout(15)
+                destination_socket.settimeout(self.timeout)
             except Exception:
                 pass
 
@@ -202,6 +227,35 @@ class Proxy:
             logging.error(f"Error forwarding to destination: {e}")
         finally:
             client.close()
+
+    @staticmethod
+    def _tunnel(client: socket.socket, destination_socket: socket.socket) -> None:  # noqa: PLR0913
+        try:
+            try:
+                client.setblocking(False)
+                destination_socket.setblocking(False)
+            except Exception:
+                pass
+
+            sockets = [client, destination_socket]
+            while True:
+                readable, _, _ = select.select(sockets, [], [], 30)
+                if not readable:
+                    break
+                for s in readable:
+                    other = destination_socket if s is client else client
+                    try:
+                        data = s.recv(4096)
+                        if not data:
+                            return
+                        other.sendall(data)
+                    except Exception:
+                        return
+        finally:
+            try:
+                destination_socket.close()
+            except Exception:
+                pass
 
     def is_authorized(self, headers: Dict[str, str]) -> bool:
         auth_header = headers.get("Proxy-Authorization")
