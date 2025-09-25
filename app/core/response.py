@@ -45,8 +45,16 @@ class ProxyResponse(bytes):
                 """
             ),
         ] = None,
+        reason: Annotated[
+            Optional[str],
+            Doc(
+                """
+                Reason phrase to send to the client.
+                """
+            ),
+        ] = None,
     ) -> "ProxyResponse":
-        reason = HTTPStatus(status_code).phrase
+        reason = reason if reason else HTTPStatus(status_code).phrase
 
         default_type = None
 
