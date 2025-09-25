@@ -16,7 +16,7 @@ from utils import (
 
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
-from .response import ProxyResponse
+from .response import ProxyResponse, ProxyStatus
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +177,7 @@ class Proxy:
                 except Exception:
                     pass
 
-                client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-                self._tunnel(client, destination_socket)
+                client.sendall(ProxyStatus.CONNECTION_ESTABLISHED)
                 has_responded = True
                 self.tunnel(client, destination_socket)
                 return

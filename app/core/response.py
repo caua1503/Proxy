@@ -98,3 +98,7 @@ class ProxyResponse(bytes):
         obj.reason = reason  # type: ignore[attr-defined]
 
         return obj
+
+
+class ProxyStatus:
+    CONNECTION_ESTABLISHED = b"HTTP/1.1 200 Connection Established\r\n\r\n"
