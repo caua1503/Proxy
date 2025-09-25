@@ -19,8 +19,8 @@ Este projeto é um servidor de proxy simples, desenvolvido em Python puro, com f
 
 ### Características
 
-- Implementação leve e sem dependências externas.
-- Ideal para uso em redes locais ou ambientes de teste.
+- Implementação leve e sem dependências externas (python puro).
+- Ideal para uso em ambientes de produção controlado, ambientes de teste ou redes locais.
 - Fácil de configurar e estender.
 
 ### Objetivo
@@ -31,13 +31,15 @@ Fornecer uma solução prática e minimalista para quem precisa de um proxy func
 
 A ideia é basicamente criar um proxy e um servidor HTTP simples usando apenas Python, para estudos, testes e necessidades internas de baixa complexidade.
 
-Este projeto é utilizado por uma aplicação interna: uma rede de proxies conectados via VPN
+Este projeto é utilizado por uma aplicação interna: uma rede de proxies conectados via VPN. Veja mais em [Motivação](docs/motivacao.md).
 
-Grande parte do core foi inspirado pelo artigo do blog da Bright Data, o guia “Python Proxy Server” ([link](https://brightdata.com.br/blog/proxies-101/python-proxy-server)). A partir dessa base, adotei minhas próprias metodologias de projeto, como a organização em classes, validações de entrada e fluxo, e um sistema de autenticação simples.
+- Grande parte do core foi inspirado pelo artigo do blog da Bright Data, o guia “Python Proxy Server” ([link](https://brightdata.com.br/blog/proxies-101/python-proxy-server)). 
+- A partir dessa base, adotei minhas próprias metodologias de projeto, como a organização em classes, validações de entrada e fluxo.
+- Implementei sistema de autenticação simples, sistema de firewall e suporte a tunelamento (metodo CONNECT).
 
 ### Tecnologias
 
-- Python (>= 3.13) #Creio que possa ser compativel com mais versões
+- Python (>= 3.13) # Acredito que possa ser compativel com mais versões
 - Sem frameworks adicionais
 
 ### Instalação
