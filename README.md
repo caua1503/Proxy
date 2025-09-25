@@ -132,7 +132,7 @@ Os logs usam o módulo `logging` do Python. Níveis:
 
 ### Roadmap
 
-- [ ] Suporte a HTTPS CONNECT
+- [x] Suporte a HTTPS CONNECT
 - [x] Regras de bloqueio/allowlist
 - [ ] Métricas e healthcheck
 
