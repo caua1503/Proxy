@@ -71,9 +71,10 @@ A configuração principal é feita ao instanciar `core.Proxy` (veja `main.py`):
 - `port` (int): porta de escuta. Padrão: `8080`
 - `backlog` (int): tamanho da fila de conexões pendentes no `listen()`. Padrão: `20`
 - `max_connections` (int): máximo de requisições processadas em paralelo (pool de threads). Padrão: `20`
-- `production_mode` (bool): quando `False`, usa timeouts curtos para facilitar debug. Padrão: `True`
 - `auth` (`ProxyAuth | None`): autenticação básica. Quando `None`, desabilita auth.
 - `firewall` (`ProxyFirewall | None`): regras de allowlist/blocklist e `no_auth_required`.
+- `debug` (bool): quando `True`, usa timeouts curtos para facilitar debug. Padrão: `False`
+- `timeout` (int): tempo de timeout para as conexões
 
 Para alterar rapidamente, edite `main.py`:
 
