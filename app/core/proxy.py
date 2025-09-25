@@ -30,9 +30,9 @@ class Proxy:
         port: int = 8888,
         backlog: int = 20,
         max_connections: int = 20,
-        production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
+        debug: bool = False,
         timeout: int = 30,
     ):
         """
@@ -45,6 +45,8 @@ class Proxy:
             max_connections (int): maximum number of requests processed simultaneously
             production_mode (bool): production mode
             auth (ProxyAuth): authentication class
+            firewall (ProxyFirewall): firewall class
+            debug (bool): debug mode
             timeout (int): timeout for the connection
 
         """
@@ -52,7 +54,7 @@ class Proxy:
         self.port = port
         self.backlog = backlog
         self.max_connections = max_connections
-        self.production_mode = production_mode
+        self.debug = debug
         self.auth = auth
         self.firewall = firewall
         self.timeout = timeout
@@ -68,8 +70,9 @@ class Proxy:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.bind((self.host, self.port))
             server.listen(self.backlog)
-            if not self.production_mode:
+            if self.debug:
                 server.settimeout(1.0)
+                logging.info("Debug mode enabled")
         except Exception as e:
             logging.critical(f"Error starting proxy server ({str(e)})")
             return
@@ -79,7 +82,7 @@ class Proxy:
             f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
         )
 
-        if not self.production_mode:
+        if self.debug:
             logging.info("To stop the server use (Ctrl+C)\n")
 
         try:  # noqa: PLR1702
@@ -92,7 +95,7 @@ class Proxy:
                             if self.firewall is not None:
                                 if not self.firewall.verify(address[0]):
                                     logging.info(
-                                        f"Connection refused ({address[0]}:{address[1]}), firewall blocked"  # noqa: E501
+                                        f"Connection refused ({address[0]}:{address[1]}) (firewall blocked)"  # noqa: E501
                                     )
                                     client.sendall(
                                         ProxyResponse(
@@ -105,7 +108,7 @@ class Proxy:
                             executor.submit(self.handle_client_request, client, address)
 
                         except socket.timeout:
-                            if not self.production_mode:
+                            if self.debug:
                                 continue
                             else:
                                 raise
