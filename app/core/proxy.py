@@ -3,6 +3,7 @@ import logging
 import select
 import socket
 from concurrent.futures import ThreadPoolExecutor
+from http import HTTPMethod, HTTPStatus
 from typing import Dict, Optional
 
 from utils import (
@@ -10,12 +11,12 @@ from utils import (
     extract_host_port_from_request,
     get_method_and_target_from_request,
     parse_headers_from_request,
-    send_proxy_auth_required,
     strip_proxy_authorization_header,
 )
 
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
+from .response import ProxyResponse
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class Proxy:
         production_mode: bool = True,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
-        timeout: int = 15,
+        timeout: int = 30,
     ):
         """
         Proxy server
@@ -93,7 +94,11 @@ class Proxy:
                                     logging.info(
                                         f"Connection refused ({address[0]}:{address[1]}), firewall blocked"  # noqa: E501
                                     )
-                                    client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                                    client.sendall(
+                                        ProxyResponse(
+                                            HTTPStatus.FORBIDDEN, headers={"Connection": "close"}
+                                        )
+                                    )
                                     client.close()
                                     continue
 
@@ -133,6 +138,7 @@ class Proxy:
                 logging.debug(f"Error receiving client data: {e}")
                 break
 
+        has_responded = False
         try:
             if self.auth is not None:
                 if self.firewall is not None and self.firewall.is_no_auth_required(address[0]):
@@ -143,12 +149,17 @@ class Proxy:
                         logging.info(
                             f"Connection refused ({address[0]}:{address[1]}), reauthentication required"  # noqa: E501
                         )
-                        send_proxy_auth_required(client)
+                        client.sendall(
+                            ProxyResponse(
+                                HTTPStatus.PROXY_AUTHENTICATION_REQUIRED,
+                                headers={"Connection": "close"},
+                            )
+                        )
                         return
 
             method, target = get_method_and_target_from_request(request)
 
-            if method == "CONNECT":
+            if method == HTTPMethod.CONNECT:
                 host, _, port_str = target.partition(":")
                 try:
                     port = int(port_str) if port_str else 443
@@ -164,6 +175,7 @@ class Proxy:
 
                 client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 self._tunnel(client, destination_socket)
+                has_responded = True
                 return
 
             logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
@@ -187,11 +199,9 @@ class Proxy:
             forward_request = strip_proxy_authorization_header(request)
             forward_request = ensure_connection_close_header(forward_request)
 
-            # If there is a body, ensure we forward it entirely based on Content-Length
             header_part, sep, body_initial = forward_request.partition(b"\r\n\r\n")
             sent_all = False
             if sep:
-                # Send header + whatever body bytes we already have
                 destination_socket.sendall(header_part + sep + body_initial)
 
                 initial_body_len = len(body_initial)
@@ -206,7 +216,6 @@ class Proxy:
                 sent_all = True
 
             if not sent_all:
-                # Fallback: send all as-is
                 destination_socket.sendall(forward_request)
 
             logging.debug("Received response from destination:")
@@ -218,13 +227,18 @@ class Proxy:
                         break
                     logging.debug(f"response: {data.decode('utf-8', errors='replace')}")
                     client.sendall(data)
+                    if not has_responded:
+                        has_responded = True
                 except socket.timeout:
-                    # Assume end of response on inactivity
                     break
 
             destination_socket.close()
         except Exception as e:
             logging.error(f"Error forwarding to destination: {e}")
+            if not has_responded:
+                client.sendall(
+                    ProxyResponse(HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"})
+                )
         finally:
             client.close()
 

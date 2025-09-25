@@ -1,4 +1,3 @@
-import socket
 from typing import Dict
 
 
@@ -34,20 +33,6 @@ def parse_headers_from_request(request: bytes) -> Dict[str, str]:
         return headers
     except Exception:
         return {}
-
-
-def send_proxy_auth_required(client: socket.socket) -> None:
-    body = b"Proxy Authentication Required"
-    response = (
-        b"HTTP/1.1 407 Proxy Authentication Required\r\n"
-        b'Proxy-Authenticate: Basic realm="Proxy"\r\n'
-        b"Content-Type: text/plain; charset=utf-8\r\n"
-        b"Connection: close\r\n" + f"Content-Length: {len(body)}\r\n\r\n".encode("utf-8") + body
-    )
-    try:
-        client.sendall(response)
-    except Exception:
-        pass
 
 
 def strip_proxy_authorization_header(request: bytes) -> bytes:
