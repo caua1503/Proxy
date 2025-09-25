@@ -12,7 +12,7 @@ class ProxyResponse(bytes):
             int | HTTPStatus,
             Doc(
                 """
-                HTTP status code to send to the client (int).
+                HTTP status code to send to the client (int or HTTPStatus).
                 """
             ),
         ],
@@ -26,13 +26,13 @@ class ProxyResponse(bytes):
             ),
         ] = None,
         headers: Annotated[
-            Optional[dict[str, str]],
+            dict[str, str],
             Doc(
                 """
                 Optional response headers to include.
                 """
             ),
-        ] = None,
+        ] = {},
         response_type: Annotated[
             Optional[Literal["JSON", "BYTES", "TEXT"]],
             Doc(
@@ -47,8 +47,6 @@ class ProxyResponse(bytes):
         ] = None,
     ) -> "ProxyResponse":
         reason = HTTPStatus(status_code).phrase
-
-        headers = headers if headers else {}
 
         default_type = None
 
