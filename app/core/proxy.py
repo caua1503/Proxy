@@ -166,6 +166,8 @@ class Proxy:
                 except Exception:
                     port = 443
 
+                logging.debug(f"Tunneling request to ({host}:{port})")
+
                 destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 destination_socket.connect((host, port))
                 try:
@@ -176,6 +178,7 @@ class Proxy:
                 client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 self._tunnel(client, destination_socket)
                 has_responded = True
+                self.tunnel(client, destination_socket)
                 return
 
             logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
@@ -242,20 +245,13 @@ class Proxy:
         finally:
             client.close()
 
-    @staticmethod
-    def _tunnel(client: socket.socket, destination_socket: socket.socket) -> None:  # noqa: PLR0913
+    def tunnel(self, client: socket.socket, destination_socket: socket.socket) -> None:  # noqa: PLR0913
         try:
-            try:
-                client.setblocking(False)
-                destination_socket.setblocking(False)
-            except Exception:
-                pass
-
             sockets = [client, destination_socket]
             while True:
-                readable, _, _ = select.select(sockets, [], [], 30)
+                readable, _, _ = select.select(sockets, [], [], self.timeout)
                 if not readable:
-                    break
+                    continue
                 for s in readable:
                     other = destination_socket if s is client else client
                     try:
@@ -266,6 +262,10 @@ class Proxy:
                     except Exception:
                         return
         finally:
+            try:
+                destination_socket.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
             try:
                 destination_socket.close()
             except Exception:
