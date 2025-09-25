@@ -43,7 +43,6 @@ class Proxy:
             port (int): port to listen
             backlog (int): backlog of connections simultaneous
             max_connections (int): maximum number of requests processed simultaneously
-            production_mode (bool): production mode
             auth (ProxyAuth): authentication class
             firewall (ProxyFirewall): firewall class
             debug (bool): debug mode
