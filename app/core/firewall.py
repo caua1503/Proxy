@@ -5,7 +5,10 @@ logger = logging.getLogger(__name__)
 
 class ProxyFirewall:
     def __init__(
-        self, allowlist: list[str] = [], blocklist: list[str] = [], no_auth_required: list[str] = []
+        self,
+        allowlist: list[str] = [],
+        blocklist: list[str] = [],
+        no_auth_required: list[str] = [],
     ):
         """
         Proxy firewall
@@ -18,6 +21,11 @@ class ProxyFirewall:
         self.allowlist = allowlist
         self.blocklist = blocklist
         self.no_auth_required = no_auth_required
+
+        if not self.allowlist and not self.blocklist and not self.no_auth_required:
+            raise ValueError(
+                "At least one of allowlist, blocklist or no_auth_required is required, or disable the firewall"  # noqa: E501
+            )
 
         for host in self.allowlist:
             if host in self.blocklist:

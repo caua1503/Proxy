@@ -11,6 +11,9 @@ class ProxyAuth:
         self.username = username
         self.password = password
 
+        if not username or not password:
+            raise ValueError("Username and password are required")
+
     def authenticate(self, username: str, password: str) -> bool:
         """
         Authenticate the user and password
