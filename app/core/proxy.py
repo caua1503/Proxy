@@ -19,7 +19,7 @@ from utils import (
 
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
-from .response import ProxyResponse, ProxyStatus
+from .response import ProxyResponse, ProxyProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class Proxy:
             pass
 
         request = b""
-        while ProxyStatus.FINISHED not in request:
+        while ProxyProtocol.FINISHED not in request:
             try:
                 data = client.recv(1024)
                 if not data:
@@ -180,7 +180,7 @@ class Proxy:
                 except Exception:
                     pass
 
-                client.sendall(ProxyStatus.CONNECTION_ESTABLISHED)
+                client.sendall(ProxyProtocol.CONNECTION_ESTABLISHED)
                 has_responded = True
                 self.tunnel(client, destination_socket)
                 return
@@ -200,7 +200,7 @@ class Proxy:
             forward_request = strip_proxy_authorization_header(request)
             forward_request = ensure_connection_close_header(forward_request)
 
-            header_part, sep, body_initial = forward_request.partition(ProxyStatus.FINISHED)
+            header_part, sep, body_initial = forward_request.partition(ProxyProtocol.FINISHED)
             sent_all = False
             if sep:
                 destination_socket.sendall(header_part + sep + body_initial)
@@ -386,7 +386,7 @@ class AsyncProxy:
 
             request = b""
             try:
-                while ProxyStatus.FINISHED not in request:
+                while ProxyProtocol.FINISHED not in request:
                     data = await asyncio.wait_for(client.read(1024), timeout=self.timeout)
                     if not data:
                         break
@@ -449,7 +449,7 @@ class AsyncProxy:
                             pass
                         return
 
-                    writer.write(ProxyStatus.CONNECTION_ESTABLISHED)
+                    writer.write(ProxyProtocol.CONNECTION_ESTABLISHED)
                     try:
                         await asyncio.wait_for(writer.drain(), timeout=self.timeout)
                     except Exception:
@@ -491,7 +491,7 @@ class AsyncProxy:
                     forward_request = strip_proxy_authorization_header(request)
                     forward_request = ensure_connection_close_header(forward_request)
 
-                    header_part, sep, body_initial = forward_request.partition(ProxyStatus.FINISHED)
+                    header_part, sep, body_initial = forward_request.partition(ProxyProtocol.FINISHED)
                     sent_all = False
                     if sep:
                         dest_writer.write(header_part + sep + body_initial)
