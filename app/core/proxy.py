@@ -11,15 +11,15 @@ from typing import Dict, Optional
 from utils import (
     ensure_connection_close_header,
     extract_host_port_from_request,
+    get_content_length_from_request,
     get_method_and_target_from_request,
     parse_headers_from_request,
     strip_proxy_authorization_header,
-    get_content_length_from_request,
 )
 
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
-from .response import ProxyResponse, ProxyProtocol
+from .response import ProxyProtocol, ProxyResponse
 
 logger = logging.getLogger(__name__)
 
@@ -491,7 +491,9 @@ class AsyncProxy:
                     forward_request = strip_proxy_authorization_header(request)
                     forward_request = ensure_connection_close_header(forward_request)
 
-                    header_part, sep, body_initial = forward_request.partition(ProxyProtocol.FINISHED)
+                    header_part, sep, body_initial = forward_request.partition(
+                        ProxyProtocol.FINISHED
+                    )
                     sent_all = False
                     if sep:
                         dest_writer.write(header_part + sep + body_initial)

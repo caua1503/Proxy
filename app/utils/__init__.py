@@ -1,9 +1,9 @@
 from .helpers import (
     ensure_connection_close_header,
     extract_host_port_from_request,
+    get_content_length_from_request,
     get_method_and_target_from_request,
     parse_headers_from_request,
-    get_content_length_from_request,
     strip_proxy_authorization_header,
 )
 

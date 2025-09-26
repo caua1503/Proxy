@@ -39,6 +39,7 @@ def get_content_length_from_request(request: bytes) -> int:
     headers = parse_headers_from_request(request)
     return int(headers.get("Content-Length", "0") or "0")
 
+
 def strip_proxy_authorization_header(request: bytes) -> bytes:
     try:
         header_part, sep, body = request.partition(b"\r\n\r\n")
