@@ -1,5 +1,5 @@
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
-from .proxy import Proxy
+from .proxy import Proxy, AsyncProxy
 
-__all__ = ["Proxy", "ProxyAuth", "ProxyFirewall"]
+__all__ = ["Proxy", "AsyncProxy", "ProxyAuth", "ProxyFirewall"]
