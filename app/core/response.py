@@ -102,3 +102,4 @@ class ProxyResponse(bytes):
 
 class ProxyStatus:
     CONNECTION_ESTABLISHED = b"HTTP/1.1 200 Connection Established\r\n\r\n"
+    FINISHED = b"\r\n\r\n"

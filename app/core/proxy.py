@@ -131,7 +131,7 @@ class Proxy:
             pass
 
         request = b""
-        while b"\r\n\r\n" not in request:
+        while ProxyStatus.FINISHED not in request:
             try:
                 data = client.recv(1024)
                 if not data:
@@ -205,7 +205,7 @@ class Proxy:
             forward_request = strip_proxy_authorization_header(request)
             forward_request = ensure_connection_close_header(forward_request)
 
-            header_part, sep, body_initial = forward_request.partition(b"\r\n\r\n")
+            header_part, sep, body_initial = forward_request.partition(ProxyStatus.FINISHED)
             sent_all = False
             if sep:
                 destination_socket.sendall(header_part + sep + body_initial)
@@ -391,7 +391,7 @@ class AsyncProxy:
 
             request = b""
             try:
-                while b"\r\n\r\n" not in request:
+                while ProxyStatus.FINISHED not in request:
                     data = await asyncio.wait_for(client.read(1024), timeout=self.timeout)
                     if not data:
                         break
@@ -500,7 +500,7 @@ class AsyncProxy:
                     forward_request = strip_proxy_authorization_header(request)
                     forward_request = ensure_connection_close_header(forward_request)
 
-                    header_part, sep, body_initial = forward_request.partition(b"\r\n\r\n")
+                    header_part, sep, body_initial = forward_request.partition(ProxyStatus.FINISHED)
                     sent_all = False
                     if sep:
                         dest_writer.write(header_part + sep + body_initial)
