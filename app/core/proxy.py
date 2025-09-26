@@ -94,7 +94,7 @@ class Proxy:
                             if self.firewall is not None:
                                 if not self.firewall.verify(address[0]):
                                     logging.info(
-                                        f"Connection refused ({address[0]}:{address[1]}) (firewall blocked)"  # noqa: E501
+                                        f"Connection refused ({address[0]}:{address[1]}) - (firewall blocked)"  # noqa: E501
                                     )
                                     client.sendall(
                                         ProxyResponse(
@@ -149,7 +149,7 @@ class Proxy:
                     headers = parse_headers_from_request(request)
                     if not self.is_authorized(headers):
                         logging.info(
-                            f"Connection refused ({address[0]}:{address[1]}), reauthentication required"  # noqa: E501
+                            f"Connection refused ({address[0]}:{address[1]}) - (reauthentication required)"  # noqa: E501
                         )
                         client.sendall(
                             ProxyResponse(
@@ -279,6 +279,15 @@ class Proxy:
 
         scheme, _, param = auth_header.partition(" ")
         if scheme.lower() != "basic" or not param:
+            return False
+
+        try:
+            decoded = base64.b64decode(param).decode("utf-8")
+            username, _, password = decoded.partition(":")
+        except Exception:
+            return False
+
+        return self.auth.authenticate(username, password) if self.auth else False
             return False
 
         try:
