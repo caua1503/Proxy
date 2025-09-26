@@ -14,6 +14,7 @@ from utils import (
     get_method_and_target_from_request,
     parse_headers_from_request,
     strip_proxy_authorization_header,
+    get_content_length_from_request,
 )
 
 from .auth import ProxyAuth
@@ -186,13 +187,7 @@ class Proxy:
 
             logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
 
-            headers_all = parse_headers_from_request(request)
-            content_length = 0
-            try:
-                if "Content-Length" in headers_all:
-                    content_length = int(headers_all.get("Content-Length", "0") or "0")
-            except Exception:
-                content_length = 0
+            content_length = get_content_length_from_request(request)
 
             host, port = extract_host_port_from_request(request)
             destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -473,11 +468,7 @@ class AsyncProxy:
 
                 logging.info(f"Forwarding request to ({client_host}:{client_port})")
 
-                headers_all = parse_headers_from_request(request)
-                try:
-                    content_length = int(headers_all.get("Content-Length", "0") or "0")
-                except Exception:
-                    content_length = 0
+                content_length = get_content_length_from_request(request)
 
                 host, port = extract_host_port_from_request(request)
 
