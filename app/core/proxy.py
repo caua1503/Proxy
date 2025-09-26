@@ -288,12 +288,3 @@ class Proxy:
             return False
 
         return self.auth.authenticate(username, password) if self.auth else False
-            return False
-
-        try:
-            decoded = base64.b64decode(param).decode("utf-8")
-            username, _, password = decoded.partition(":")
-        except Exception:
-            return False
-
-        return self.auth.authenticate(username, password) if self.auth else False
