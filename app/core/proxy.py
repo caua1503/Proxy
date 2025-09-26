@@ -1,7 +1,9 @@
+import asyncio
 import base64
 import logging
 import select
 import socket
+from asyncio.streams import StreamReader, StreamWriter
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPMethod, HTTPStatus
 from typing import Dict, Optional
@@ -271,6 +273,363 @@ class Proxy:
                 destination_socket.close()
             except Exception:
                 pass
+
+    def is_authorized(self, headers: Dict[str, str]) -> bool:
+        auth_header = headers.get("Proxy-Authorization")
+        if not auth_header:
+            return False
+
+        scheme, _, param = auth_header.partition(" ")
+        if scheme.lower() != "basic" or not param:
+            return False
+
+        try:
+            decoded = base64.b64decode(param).decode("utf-8")
+            username, _, password = decoded.partition(":")
+        except Exception:
+            return False
+
+        return self.auth.authenticate(username, password) if self.auth else False
+
+
+class AsyncProxy:
+    def __init__(
+        self,
+        host: str = "0.0.0.0",
+        port: int = 8888,
+        backlog: int = 1000,
+        max_connections: int = 1000,
+        auth: Optional[ProxyAuth] = None,
+        firewall: Optional[ProxyFirewall] = None,
+        debug: bool = False,
+        timeout: int = 30,
+    ):
+        """
+        Proxy server
+
+        args:
+            host (str): host to bind
+            port (int): port to listen
+            backlog (int): backlog of connections simultaneous
+            max_connections (int): maximum number of requests processed simultaneously
+            auth (ProxyAuth): authentication class
+            firewall (ProxyFirewall): firewall class
+            debug (bool): debug mode
+            timeout (int): timeout for the connection
+
+        """
+        self.host = host
+        self.port = port
+        self.backlog = backlog
+        self.max_connections = max_connections
+        self.debug = debug
+        self.auth = auth
+        self.firewall = firewall
+        self.timeout = timeout
+
+        if self.backlog < self.max_connections:
+            logging.warning(
+                f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
+            )
+
+    async def run(self) -> None:
+        logging.info("Starting async proxy server...")
+        self._semaphore = asyncio.Semaphore(self.max_connections)
+
+        try:
+            server = await asyncio.start_server(
+                self.handle_client_request,
+                self.host,
+                self.port,
+                backlog=self.backlog,
+            )
+        except Exception as e:
+            logging.critical(f"Error starting async proxy server ({str(e)})")
+            return
+
+        logging.info(
+            f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
+        )
+        if self.debug:
+            logging.info("Debug mode enabled")
+
+        async with server:
+            try:
+                await server.serve_forever()
+            except asyncio.CancelledError:
+                pass
+
+    async def handle_client_request(self, client: StreamReader, writer: StreamWriter) -> None:  # noqa: PLR0915, PLR0912, PLR0914
+        PEER_TUPLE_MIN_LEN_FOR_PORT = 2
+        async with self._semaphore:  # type: ignore[attr-defined] # noqa: PLR1702, PLR0914
+            peer = writer.get_extra_info("peername")
+            client_host = peer[0] if isinstance(peer, tuple) and len(peer) >= 1 else "?"
+            client_port = (
+                peer[1]
+                if isinstance(peer, tuple) and len(peer) >= PEER_TUPLE_MIN_LEN_FOR_PORT
+                else -1
+            )
+
+            logging.debug("Request accepted")
+
+            if self.firewall is not None and not self.firewall.verify(client_host):
+                logging.info(
+                    f"Connection refused ({client_host}:{client_port}) - (firewall blocked)"
+                )
+                try:
+                    writer.write(
+                        ProxyResponse(HTTPStatus.FORBIDDEN, headers={"Connection": "close"})
+                    )
+                    await writer.drain()
+                finally:
+                    writer.close()
+                    try:
+                        await writer.wait_closed()
+                    except Exception:
+                        pass
+                return
+
+            request = b""
+            try:
+                while b"\r\n\r\n" not in request:
+                    data = await asyncio.wait_for(client.read(1024), timeout=self.timeout)
+                    if not data:
+                        break
+                    request += data
+            except asyncio.TimeoutError:
+                logging.debug("Timeout receiving client headers/body")
+                try:
+                    writer.write(
+                        ProxyResponse(HTTPStatus.REQUEST_TIMEOUT, headers={"Connection": "close"})
+                    )
+                    await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                except Exception:
+                    pass
+                return
+            except Exception as e:
+                logging.debug(f"Error receiving client data: {e}")
+
+            has_responded = False
+            try:
+                if self.auth is not None:
+                    if self.firewall is not None and self.firewall.is_no_auth_required(client_host):
+                        pass
+                    else:
+                        headers = parse_headers_from_request(request)
+                        if not self.is_authorized(headers):
+                            logging.info(
+                                f"Connection refused ({client_host}:{client_port}) - (reauthentication required)"  # noqa: E501
+                            )
+                            writer.write(
+                                ProxyResponse(
+                                    HTTPStatus.PROXY_AUTHENTICATION_REQUIRED,
+                                    headers={"Connection": "close"},
+                                )
+                            )
+                            await writer.drain()
+                            return
+
+                method, target = get_method_and_target_from_request(request)
+                if method == HTTPMethod.CONNECT:
+                    host, _, port_str = target.partition(":")
+                    try:
+                        port = int(port_str) if port_str else 443
+                    except Exception:
+                        port = 443
+
+                    logging.debug(f"Tunneling request to ({host}:{port})")
+
+                    try:
+                        dest_reader, dest_writer = await asyncio.wait_for(
+                            asyncio.open_connection(host, port), timeout=self.timeout
+                        )
+                    except Exception as e:
+                        logging.error(f"Error connecting to destination {host}:{port} - {e}")
+                        writer.write(
+                            ProxyResponse(HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"})
+                        )
+                        try:
+                            await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                        except Exception:
+                            pass
+                        return
+
+                    writer.write(ProxyStatus.CONNECTION_ESTABLISHED)
+                    try:
+                        await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                    except Exception:
+                        pass
+                    has_responded = True
+
+                    try:
+                        await self.tunnel(client, writer, dest_reader, dest_writer)
+                    finally:
+                        try:
+                            dest_writer.close()
+                            await dest_writer.wait_closed()
+                        except Exception:
+                            pass
+                    return
+
+                logging.info(f"Forwarding request to ({client_host}:{client_port})")
+
+                headers_all = parse_headers_from_request(request)
+                try:
+                    content_length = int(headers_all.get("Content-Length", "0") or "0")
+                except Exception:
+                    content_length = 0
+
+                host, port = extract_host_port_from_request(request)
+
+                try:
+                    dest_reader, dest_writer = await asyncio.wait_for(
+                        asyncio.open_connection(host, port), timeout=self.timeout
+                    )
+                except Exception as e:
+                    logging.error(f"Error connecting to destination {host}:{port} - {e}")
+                    writer.write(
+                        ProxyResponse(HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"})
+                    )
+                    try:
+                        await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                    except Exception:
+                        pass
+                    return
+
+                try:
+                    forward_request = strip_proxy_authorization_header(request)
+                    forward_request = ensure_connection_close_header(forward_request)
+
+                    header_part, sep, body_initial = forward_request.partition(b"\r\n\r\n")
+                    sent_all = False
+                    if sep:
+                        dest_writer.write(header_part + sep + body_initial)
+                        try:
+                            await asyncio.wait_for(dest_writer.drain(), timeout=self.timeout)
+                        except Exception:
+                            pass
+
+                        initial_body_len = len(body_initial)
+                        remaining = max(0, content_length - initial_body_len)
+
+                        while remaining > 0:
+                            chunk = await asyncio.wait_for(
+                                client.read(min(4096, remaining)), timeout=self.timeout
+                            )
+                            if not chunk:
+                                break
+                            dest_writer.write(chunk)
+                            try:
+                                await asyncio.wait_for(dest_writer.drain(), timeout=self.timeout)
+                            except Exception:
+                                pass
+                            remaining -= len(chunk)
+                        sent_all = True
+
+                    if not sent_all:
+                        dest_writer.write(forward_request)
+                        try:
+                            await asyncio.wait_for(dest_writer.drain(), timeout=self.timeout)
+                        except Exception:
+                            pass
+
+                    while True:
+                        data = await asyncio.wait_for(dest_reader.read(4096), timeout=self.timeout)
+                        if not data:
+                            break
+                        writer.write(data)
+                        try:
+                            await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                        except Exception:
+                            pass
+                        if not has_responded:
+                            has_responded = True
+                except asyncio.TimeoutError:
+                    logging.error("Timeout while forwarding to destination")
+                    if not has_responded:
+                        try:
+                            writer.write(
+                                ProxyResponse(
+                                    HTTPStatus.GATEWAY_TIMEOUT, headers={"Connection": "close"}
+                                )
+                            )
+                            await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logging.error(f"Error forwarding to destination: {e}")
+                    if not has_responded:
+                        try:
+                            writer.write(
+                                ProxyResponse(
+                                    HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"}
+                                )
+                            )
+                            try:
+                                await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+                finally:
+                    try:
+                        dest_writer.close()
+                        await dest_writer.wait_closed()
+                    except Exception:
+                        pass
+            finally:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+
+    async def tunnel(
+        self,
+        client_reader: StreamReader,
+        client_writer: StreamWriter,
+        dest_reader: StreamReader,
+        dest_writer: StreamWriter,
+    ) -> None:
+        async def _relay(src: StreamReader, dst: StreamWriter) -> None:
+            while True:
+                try:
+                    data = await asyncio.wait_for(src.read(4096), timeout=self.timeout)
+                    if not data:
+                        break
+                    dst.write(data)
+                    try:
+                        await asyncio.wait_for(dst.drain(), timeout=self.timeout)
+                    except Exception:
+                        pass
+                except asyncio.TimeoutError:
+                    break
+                except Exception:
+                    break
+
+        task_up = asyncio.create_task(_relay(client_reader, dest_writer))
+        task_down = asyncio.create_task(_relay(dest_reader, client_writer))
+
+        done, pending = await asyncio.wait(
+            {task_up, task_down}, return_when=asyncio.FIRST_COMPLETED
+        )
+
+        for t in pending:
+            t.cancel()
+            try:
+                await t
+            except Exception:
+                pass
+        try:
+            dest_writer.close()
+            await dest_writer.wait_closed()
+        except Exception:
+            pass
+        try:
+            client_writer.close()
+            await client_writer.wait_closed()
+        except Exception:
+            pass
 
     def is_authorized(self, headers: Dict[str, str]) -> bool:
         auth_header = headers.get("Proxy-Authorization")
