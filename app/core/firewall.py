@@ -18,9 +18,9 @@ class ProxyFirewall:
             blocklist (list[str]): list of blocked hosts
             no_auth_required (list[str]): list of hosts that do not require authentication
         """
-        self.allowlist = allowlist
-        self.blocklist = blocklist
-        self.no_auth_required = no_auth_required
+        self.allowlist = set(allowlist)
+        self.blocklist = set(blocklist)
+        self.no_auth_required = set(no_auth_required)
 
         if not self.allowlist and not self.blocklist and not self.no_auth_required:
             raise ValueError(
