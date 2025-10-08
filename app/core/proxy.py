@@ -45,6 +45,7 @@ class SyncProxy:
             max_connections (int): maximum number of requests processed simultaneously
             auth (ProxyAuth): authentication class
             firewall (ProxyFirewall): firewall class
+            logger (ProxyLogger): logger class
             debug (bool): debug mode
             timeout (int): timeout for the connection
 
@@ -314,6 +315,7 @@ class Proxy:
             max_connections (int): maximum number of requests processed simultaneously
             auth (ProxyAuth): authentication class
             firewall (ProxyFirewall): firewall class
+            logger (ProxyLogger): logger class
             debug (bool): debug mode
             timeout (int): timeout for the connection
 
