@@ -23,10 +23,7 @@ from .response import ProxyProtocol, ProxyResponse
 
 logger = logging.getLogger(__name__)
 
-# logging.basicConfig()
-
-
-class Proxy:
+class SyncProxy:
     def __init__(
         self,
         host: str = "0.0.0.0",
@@ -287,7 +284,7 @@ class Proxy:
         return self.auth.authenticate(username, password) if self.auth else False
 
 
-class AsyncProxy:
+class Proxy:
     def __init__(
         self,
         host: str = "0.0.0.0",
@@ -327,8 +324,7 @@ class AsyncProxy:
                 f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
 
-    async def run(self) -> None:
-        logging.info("Starting async proxy server...")
+    async def _run(self) -> None:
         self._semaphore = asyncio.Semaphore(self.max_connections)
 
         try:
@@ -353,6 +349,12 @@ class AsyncProxy:
                 await server.serve_forever()
             except asyncio.CancelledError:
                 pass
+
+    def run(self) -> None:
+        asyncio.run(self._run())
+
+    async def async_run(self) -> None:
+        return await self._run()
 
     async def handle_client_request(self, client: StreamReader, writer: StreamWriter) -> None:  # noqa: PLR0915, PLR0912, PLR0914
         PEER_TUPLE_MIN_LEN_FOR_PORT = 2
