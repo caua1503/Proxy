@@ -112,7 +112,7 @@ class SyncProxy:
                                     client.close()
                                     continue
 
-                            executor.submit(self.handle_client_request, client, address)
+                            executor.submit(self._handle_client_request, client, address)
 
                         except socket.timeout:
                             if self.debug:
@@ -128,7 +128,7 @@ class SyncProxy:
         except KeyboardInterrupt:
             self.logger.info("Terminating all open connections")
 
-    def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:  # noqa: PLR0914, PLR0915, PLR0912
+    def _handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:  # noqa: PLR0914, PLR0915, PLR0912
         self.logger.debug("Request accepted")
 
         try:
@@ -155,7 +155,7 @@ class SyncProxy:
                     pass
                 else:
                     headers = parse_headers_from_request(request)
-                    if not self.is_authorized(headers):
+                    if not self._is_authorized(headers):
                         self.logger.info(
                             f"Connection refused ({address[0]}:{address[1]}) - (reauthentication required)"  # noqa: E501
                         )
@@ -187,7 +187,7 @@ class SyncProxy:
 
                 client.sendall(ProxyProtocol.CONNECTION_ESTABLISHED)
                 has_responded = True
-                self.tunnel(client, destination_socket)
+                self._tunnel(client, destination_socket)
                 return
 
             self.logger.info(f"Forwarding request to ({address[0]}:{address[1]})")
@@ -248,7 +248,7 @@ class SyncProxy:
         finally:
             client.close()
 
-    def tunnel(self, client: socket.socket, destination_socket: socket.socket) -> None:  # noqa: PLR0913
+    def _tunnel(self, client: socket.socket, destination_socket: socket.socket) -> None:  # noqa: PLR0913
         try:
             sockets = [client, destination_socket]
             while True:
@@ -274,7 +274,7 @@ class SyncProxy:
             except Exception:
                 pass
 
-    def is_authorized(self, headers: Dict[str, str]) -> bool:
+    def _is_authorized(self, headers: Dict[str, str]) -> bool:
         auth_header = headers.get("Proxy-Authorization")
         if not auth_header:
             return False
@@ -345,7 +345,7 @@ class Proxy:
 
         try:
             server = await asyncio.start_server(
-                self.handle_client_request,
+                self._handle_client_request,
                 self.host,
                 self.port,
                 backlog=self.backlog,
@@ -372,7 +372,7 @@ class Proxy:
     async def async_run(self) -> None:
         return await self._run()
 
-    async def handle_client_request(self, client: StreamReader, writer: StreamWriter) -> None:  # noqa: PLR0915, PLR0912, PLR0914
+    async def _handle_client_request(self, client: StreamReader, writer: StreamWriter) -> None:  # noqa: PLR0915, PLR0912, PLR0914
         PEER_TUPLE_MIN_LEN_FOR_PORT = 2
         async with self._semaphore:  # type: ignore[attr-defined] # noqa: PLR1702, PLR0914
             peer = writer.get_extra_info("peername")
@@ -429,7 +429,7 @@ class Proxy:
                         pass
                     else:
                         headers = parse_headers_from_request(request)
-                        if not self.is_authorized(headers):
+                        if not self._is_authorized(headers):
                             self.logger.info(
                                 f"Connection refused ({client_host}:{client_port}) - (reauthentication required)"  # noqa: E501
                             )
@@ -475,7 +475,7 @@ class Proxy:
                     has_responded = True
 
                     try:
-                        await self.tunnel(client, writer, dest_reader, dest_writer)
+                        await self._tunnel(client, writer, dest_reader, dest_writer)
                     finally:
                         try:
                             dest_writer.close()
@@ -595,7 +595,7 @@ class Proxy:
                 except Exception:
                     pass
 
-    async def tunnel(
+    async def _tunnel(
         self,
         client_reader: StreamReader,
         client_writer: StreamWriter,
@@ -642,7 +642,7 @@ class Proxy:
         except Exception:
             pass
 
-    def is_authorized(self, headers: Dict[str, str]) -> bool:
+    def _is_authorized(self, headers: Dict[str, str]) -> bool:
         auth_header = headers.get("Proxy-Authorization")
         if not auth_header:
             return False
