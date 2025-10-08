@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import logging
 import select
 import socket
 from asyncio.streams import StreamReader, StreamWriter
@@ -19,9 +18,9 @@ from utils import (
 
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
+from .logger import ProxyLogger, ProxyLogLevel
 from .response import ProxyProtocol, ProxyResponse
 
-logger = logging.getLogger(__name__)
 
 class SyncProxy:
     def __init__(
@@ -32,6 +31,7 @@ class SyncProxy:
         max_connections: int = 20,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
+        logger: Optional[ProxyLogger] = None,
         debug: bool = False,
         timeout: int = 30,
     ):
@@ -57,32 +57,37 @@ class SyncProxy:
         self.auth = auth
         self.firewall = firewall
         self.timeout = timeout
+        self.logger = (
+            logger
+            if logger
+            else ProxyLogger(level=ProxyLogLevel.DEBUG if debug else ProxyLogLevel.INFO)
+        )
 
         if self.backlog < self.max_connections:
-            logging.warning(
+            self.logger.warning(
                 f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
 
     def run(self) -> None:
-        logging.info("Starting proxy server...")
+        self.logger.info("Starting proxy server...")
         try:
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.bind((self.host, self.port))
             server.listen(self.backlog)
             if self.debug:
                 server.settimeout(1.0)
-                logging.info("Debug mode enabled")
+                self.logger.info("Debug mode enabled")
         except Exception as e:
-            logging.critical(f"Error starting proxy server ({str(e)})")
+            self.logger.critical(f"Error starting proxy server ({str(e)})")
             return
 
-        logging.info(f"Proxy server started (http://{self.host}:{self.port})")
-        logging.info(
+        self.logger.info(f"Proxy server started (http://{self.host}:{self.port})")
+        self.logger.info(
             f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
         )
 
         if self.debug:
-            logging.info("To stop the server use (Ctrl+C)\n")
+            self.logger.info("To stop the server use (Ctrl+C)\n")
 
         try:  # noqa: PLR1702
             with ThreadPoolExecutor(max_workers=self.max_connections) as executor:
@@ -90,10 +95,12 @@ class SyncProxy:
                     while True:
                         try:
                             client, address = server.accept()
-                            logging.debug(f"Accepting connection from ({address[0]}:{address[1]})")
+                            self.logger.debug(
+                                f"Accepting connection from ({address[0]}:{address[1]})"
+                            )
                             if self.firewall is not None:
                                 if not self.firewall.verify(address[0]):
-                                    logging.info(
+                                    self.logger.info(
                                         f"Connection refused ({address[0]}:{address[1]}) - (firewall blocked)"  # noqa: E501
                                     )
                                     client.sendall(
@@ -112,16 +119,16 @@ class SyncProxy:
                             else:
                                 raise
                 except KeyboardInterrupt:
-                    logging.info("Proxy server stopped by Ctrl+C. Ending...")
-                    logging.info("Wait until all open connections are closed...")
+                    self.logger.info("Proxy server stopped by Ctrl+C. Ending...")
+                    self.logger.info("Wait until all open connections are closed...")
                 finally:
                     server.close()
 
         except KeyboardInterrupt:
-            logging.info("Terminating all open connections")
+            self.logger.info("Terminating all open connections")
 
     def handle_client_request(self, client: socket.socket, address: tuple[str, int]) -> None:  # noqa: PLR0914, PLR0915, PLR0912
-        logging.debug("Request accepted")
+        self.logger.debug("Request accepted")
 
         try:
             client.settimeout(self.timeout)
@@ -135,9 +142,9 @@ class SyncProxy:
                 if not data:
                     break
                 request += data
-                # logging.debug(f"{data.decode(errors='replace')}")
+                # self.logger.debug(f"{data.decode(errors='replace')}")
             except Exception as e:
-                logging.debug(f"Error receiving client data: {e}")
+                self.logger.debug(f"Error receiving client data: {e}")
                 break
 
         has_responded = False
@@ -148,7 +155,7 @@ class SyncProxy:
                 else:
                     headers = parse_headers_from_request(request)
                     if not self.is_authorized(headers):
-                        logging.info(
+                        self.logger.info(
                             f"Connection refused ({address[0]}:{address[1]}) - (reauthentication required)"  # noqa: E501
                         )
                         client.sendall(
@@ -168,7 +175,7 @@ class SyncProxy:
                 except Exception:
                     port = 443
 
-                logging.debug(f"Tunneling request to ({host}:{port})")
+                self.logger.debug(f"Tunneling request to ({host}:{port})")
 
                 destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 destination_socket.connect((host, port))
@@ -182,7 +189,7 @@ class SyncProxy:
                 self.tunnel(client, destination_socket)
                 return
 
-            logging.info(f"Forwarding request to ({address[0]}:{address[1]})")
+            self.logger.info(f"Forwarding request to ({address[0]}:{address[1]})")
 
             content_length = get_content_length_from_request(request)
 
@@ -216,14 +223,14 @@ class SyncProxy:
             if not sent_all:
                 destination_socket.sendall(forward_request)
 
-            logging.debug("Received response from destination:")
+            self.logger.debug("Received response from destination:")
 
             while True:
                 try:
                     data = destination_socket.recv(4096)
                     if not data:
                         break
-                    logging.debug(f"response: {data.decode('utf-8', errors='replace')}")
+                    self.logger.debug(f"response: {data.decode('utf-8', errors='replace')}")
                     client.sendall(data)
                     if not has_responded:
                         has_responded = True
@@ -232,7 +239,7 @@ class SyncProxy:
 
             destination_socket.close()
         except Exception as e:
-            logging.error(f"Error forwarding to destination: {e}")
+            self.logger.error(f"Error forwarding to destination: {e}")
             if not has_responded:
                 client.sendall(
                     ProxyResponse(HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"})
@@ -293,6 +300,7 @@ class Proxy:
         max_connections: int = 1000,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
+        logger: Optional[ProxyLogger] = None,
         debug: bool = False,
         timeout: int = 30,
     ):
@@ -318,13 +326,19 @@ class Proxy:
         self.auth = auth
         self.firewall = firewall
         self.timeout = timeout
+        self.logger = (
+            logger
+            if logger
+            else ProxyLogger(level=ProxyLogLevel.DEBUG if debug else ProxyLogLevel.INFO)
+        )
 
         if self.backlog < self.max_connections:
-            logging.warning(
+            self.logger.warning(
                 f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
 
     async def _run(self) -> None:
+        self.logger.info("Starting async proxy server...")
         self._semaphore = asyncio.Semaphore(self.max_connections)
 
         try:
@@ -335,14 +349,14 @@ class Proxy:
                 backlog=self.backlog,
             )
         except Exception as e:
-            logging.critical(f"Error starting async proxy server ({str(e)})")
+            self.logger.critical(f"Error starting async proxy server ({str(e)})")
             return
 
-        logging.info(
+        self.logger.info(
             f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
         )
         if self.debug:
-            logging.info("Debug mode enabled")
+            self.logger.info("Debug mode enabled")
 
         async with server:
             try:
@@ -367,10 +381,10 @@ class Proxy:
                 else -1
             )
 
-            logging.debug("Request accepted")
+            self.logger.debug("Request accepted")
 
             if self.firewall is not None and not self.firewall.verify(client_host):
-                logging.info(
+                self.logger.info(
                     f"Connection refused ({client_host}:{client_port}) - (firewall blocked)"
                 )
                 try:
@@ -394,7 +408,7 @@ class Proxy:
                         break
                     request += data
             except asyncio.TimeoutError:
-                logging.debug("Timeout receiving client headers/body")
+                self.logger.debug("Timeout receiving client headers/body")
                 try:
                     writer.write(
                         ProxyResponse(HTTPStatus.REQUEST_TIMEOUT, headers={"Connection": "close"})
@@ -404,7 +418,7 @@ class Proxy:
                     pass
                 return
             except Exception as e:
-                logging.debug(f"Error receiving client data: {e}")
+                self.logger.debug(f"Error receiving client data: {e}")
 
             has_responded = False
             try:
@@ -414,7 +428,7 @@ class Proxy:
                     else:
                         headers = parse_headers_from_request(request)
                         if not self.is_authorized(headers):
-                            logging.info(
+                            self.logger.info(
                                 f"Connection refused ({client_host}:{client_port}) - (reauthentication required)"  # noqa: E501
                             )
                             writer.write(
@@ -434,14 +448,14 @@ class Proxy:
                     except Exception:
                         port = 443
 
-                    logging.debug(f"Tunneling request to ({host}:{port})")
+                    self.logger.debug(f"Tunneling request to ({host}:{port})")
 
                     try:
                         dest_reader, dest_writer = await asyncio.wait_for(
                             asyncio.open_connection(host, port), timeout=self.timeout
                         )
                     except Exception as e:
-                        logging.error(f"Error connecting to destination {host}:{port} - {e}")
+                        self.logger.error(f"Error connecting to destination {host}:{port} - {e}")
                         writer.write(
                             ProxyResponse(HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"})
                         )
@@ -468,7 +482,7 @@ class Proxy:
                             pass
                     return
 
-                logging.info(f"Forwarding request to ({client_host}:{client_port})")
+                self.logger.info(f"Forwarding request to ({client_host}:{client_port})")
 
                 content_length = get_content_length_from_request(request)
 
@@ -479,7 +493,7 @@ class Proxy:
                         asyncio.open_connection(host, port), timeout=self.timeout
                     )
                 except Exception as e:
-                    logging.error(f"Error connecting to destination {host}:{port} - {e}")
+                    self.logger.error(f"Error connecting to destination {host}:{port} - {e}")
                     writer.write(
                         ProxyResponse(HTTPStatus.BAD_GATEWAY, headers={"Connection": "close"})
                     )
@@ -540,7 +554,7 @@ class Proxy:
                         if not has_responded:
                             has_responded = True
                 except asyncio.TimeoutError:
-                    logging.error("Timeout while forwarding to destination")
+                    self.logger.error("Timeout while forwarding to destination")
                     if not has_responded:
                         try:
                             writer.write(
@@ -552,7 +566,7 @@ class Proxy:
                         except Exception:
                             pass
                 except Exception as e:
-                    logging.error(f"Error forwarding to destination: {e}")
+                    self.logger.error(f"Error forwarding to destination: {e}")
                     if not has_responded:
                         try:
                             writer.write(
