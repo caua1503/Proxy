@@ -24,7 +24,7 @@ ignore = ['PLR0917', 'PLR0913']
 
 [tool.taskipy.tasks]
 check = "uv run ruff check . && uv run ty check"
-lint = "uv run task check && uv run ruff format . && uv run ruff check --fix ."
+lint = "uv run ruff format . && uv run ruff check --fix ."
 
 [tool.ty.rules]
 unresolved-import = "ignore"

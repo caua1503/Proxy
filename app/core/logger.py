@@ -24,11 +24,12 @@ class ProxyLogLevel(IntEnum):
     Níveis de log internos, independentes do logging padrão do Python.
     Valores sequenciais começando do 0, onde números maiores indicam maior severidade.
     """
-    DEBUG = 0      # Mais verboso, para desenvolvimento
-    INFO = 1       # Informações gerais
-    WARNING = 2    # Avisos que não impedem execução
-    ERROR = 3      # Erros que impedem funcionalidade específica
-    CRITICAL = 4   # Erros críticos que podem parar o sistema
+
+    DEBUG = 0  # Mais verboso, para desenvolvimento
+    INFO = 1  # Informações gerais
+    WARNING = 2  # Avisos que não impedem execução
+    ERROR = 3  # Erros que impedem funcionalidade específica
+    CRITICAL = 4  # Erros críticos que podem parar o sistema
 
 
 class ProxyLogger:
@@ -40,7 +41,7 @@ class ProxyLogger:
         ProxyLogLevel.ERROR: logging.ERROR,
         ProxyLogLevel.CRITICAL: logging.CRITICAL,
     }
-    
+
     def __init__(self, level: ProxyLogLevel = ProxyLogLevel.INFO):
         self.logger = logging.getLogger(__name__)
         self.level = level
