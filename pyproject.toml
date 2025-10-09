@@ -8,9 +8,9 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "mypy>=1.18.2",
     "ruff>=0.13.1",
     "taskipy>=1.14.1",
+    "ty>=0.0.1a21",
 ]
 
 [tool.ruff]
@@ -21,16 +21,10 @@ preview=true
 select = ['I', 'F', 'E', 'W', 'PL', 'PT']
 ignore = ['PLR0917', 'PLR0913']
 
-[tool.mypy]
-python_version = "3.13"
-warn_return_any = true
-disallow_untyped_defs = true
-strict_optional = true
-no_implicit_optional = true
-show_error_codes = true
-pretty = true
 
 [tool.taskipy.tasks]
+check = "uv run ruff check . && uv run ty check"
+lint = "uv run task check && uv run ruff format . && uv run ruff check --fix ."
 
-check = "uv run ruff check . && uv run mypy ."
-lint = "uv run ruff format . && uv run ruff check --fix ."
+[tool.ty.rules]
+unresolved-import = "ignore"
