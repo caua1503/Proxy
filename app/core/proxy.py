@@ -31,7 +31,7 @@ class SyncProxy:
         max_connections: int = 20,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
-        logger: Optional[ProxyLogger] = None,
+        logger: ProxyLogger = ProxyLogger(),
         debug: bool = False,
         timeout: int = 30,
     ):
@@ -58,11 +58,7 @@ class SyncProxy:
         self.auth = auth
         self.firewall = firewall
         self.timeout = timeout
-        self.logger = (
-            logger
-            if logger
-            else ProxyLogger(level=ProxyLogLevel.DEBUG if debug else ProxyLogLevel.INFO)
-        )
+        self.logger = logger if not debug else ProxyLogger(level=ProxyLogLevel.DEBUG)
 
         if self.backlog < self.max_connections:
             self.logger.warning(
@@ -301,7 +297,7 @@ class Proxy:
         max_connections: int = 1000,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
-        logger: Optional[ProxyLogger] = None,
+        logger: ProxyLogger = ProxyLogger(),
         debug: bool = False,
         timeout: int = 30,
     ):
@@ -328,11 +324,7 @@ class Proxy:
         self.auth = auth
         self.firewall = firewall
         self.timeout = timeout
-        self.logger = (
-            logger
-            if logger
-            else ProxyLogger(level=ProxyLogLevel.DEBUG if debug else ProxyLogLevel.INFO)
-        )
+        self.logger = logger if not debug else ProxyLogger(level=ProxyLogLevel.DEBUG)
 
         if self.backlog < self.max_connections:
             self.logger.warning(
