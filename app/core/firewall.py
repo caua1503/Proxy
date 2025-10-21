@@ -1,6 +1,6 @@
-import logging
+from .logger import ProxyLogger
 
-logger = logging.getLogger(__name__)
+logger = ProxyLogger()
 
 
 class ProxyFirewall:
