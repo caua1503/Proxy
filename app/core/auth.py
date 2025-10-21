@@ -1,3 +1,6 @@
+import base64
+
+
 class ProxyAuth:
     """
     Proxy authentication
@@ -28,3 +31,20 @@ class ProxyAuth:
             return True
         else:
             return False
+
+    def is_authorized(self, headers: dict[str, str]) -> bool:
+        auth_header = headers.get("Proxy-Authorization")
+        if not auth_header:
+            return False
+
+        scheme, _, param = auth_header.partition(" ")
+        if scheme.lower() != "basic" or not param:
+            return False
+
+        try:
+            decoded = base64.b64decode(param).decode("utf-8")
+            username, _, password = decoded.partition(":")
+        except Exception:
+            return False
+
+        return self.authenticate(username, password)

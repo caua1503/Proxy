@@ -1,11 +1,10 @@
 import asyncio
-import base64
 import select
 import socket
 from asyncio.streams import StreamReader, StreamWriter
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPMethod, HTTPStatus
-from typing import Dict, Optional
+from typing import Optional
 
 from utils import (
     ensure_connection_close_header,
@@ -151,7 +150,7 @@ class SyncProxy:
                     pass
                 else:
                     headers = parse_headers_from_request(request)
-                    if not self._is_authorized(headers):
+                    if not self.auth.is_authorized(headers):
                         self.logger.info(
                             f"Connection refused ({address[0]}:{address[1]}) - (reauthentication required)"  # noqa: E501
                         )
@@ -270,23 +269,6 @@ class SyncProxy:
             except Exception:
                 pass
 
-    def _is_authorized(self, headers: Dict[str, str]) -> bool:
-        auth_header = headers.get("Proxy-Authorization")
-        if not auth_header:
-            return False
-
-        scheme, _, param = auth_header.partition(" ")
-        if scheme.lower() != "basic" or not param:
-            return False
-
-        try:
-            decoded = base64.b64decode(param).decode("utf-8")
-            username, _, password = decoded.partition(":")
-        except Exception:
-            return False
-
-        return self.auth.authenticate(username, password) if self.auth else False
-
 
 class Proxy:
     def __init__(
@@ -345,7 +327,7 @@ class Proxy:
         except Exception as e:
             self.logger.critical(f"Error starting async proxy server ({str(e)})")
             return
-
+        self.logger.info(f"Proxy server started (http://{self.host}:{self.port})")
         self.logger.info(
             f"Accepting ({self.max_connections}) simultaneous connections, backlog: {self.backlog}"
         )
@@ -421,7 +403,7 @@ class Proxy:
                         pass
                     else:
                         headers = parse_headers_from_request(request)
-                        if not self._is_authorized(headers):
+                        if not self.auth.is_authorized(headers):
                             self.logger.info(
                                 f"Connection refused ({client_host}:{client_port}) - (reauthentication required)"  # noqa: E501
                             )
@@ -435,6 +417,7 @@ class Proxy:
                             return
 
                 method, target = get_method_and_target_from_request(request)
+
                 if method == HTTPMethod.CONNECT:
                     host, _, port_str = target.partition(":")
                     try:
@@ -633,20 +616,3 @@ class Proxy:
             await client_writer.wait_closed()
         except Exception:
             pass
-
-    def _is_authorized(self, headers: Dict[str, str]) -> bool:
-        auth_header = headers.get("Proxy-Authorization")
-        if not auth_header:
-            return False
-
-        scheme, _, param = auth_header.partition(" ")
-        if scheme.lower() != "basic" or not param:
-            return False
-
-        try:
-            decoded = base64.b64decode(param).decode("utf-8")
-            username, _, password = decoded.partition(":")
-        except Exception:
-            return False
-
-        return self.auth.authenticate(username, password) if self.auth else False
