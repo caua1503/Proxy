@@ -103,3 +103,10 @@ class ProxyResponse(bytes):
 class ProxyProtocol:
     CONNECTION_ESTABLISHED = b"HTTP/1.1 200 Connection Established\r\n\r\n"
     FINISHED = b"\r\n\r\n"
+    CONNECTION_CLOSE = {"Connection": "close"}
+
+    def CONNECT_LINE(target: str) -> bytes:
+        return (f"CONNECT {target} HTTP/1.1\r\n\r\n").encode()
+
+
+# class Manager
