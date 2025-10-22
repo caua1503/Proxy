@@ -190,6 +190,14 @@ class SyncProxy:
             content_length = get_content_length_from_request(request)
 
             host, port = extract_host_port_from_request(request)
+
+            if not host or not host.strip():
+                self.logger.error("Invalid or empty host extracted from request")
+                client.sendall(
+                    ProxyResponse(HTTPStatus.BAD_REQUEST, headers={"Connection": "close"})
+                )
+                return
+
             destination_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             destination_socket.connect((host, port))
             try:
@@ -313,6 +321,9 @@ class Proxy:
                 f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
 
+    def get_info(self) -> tuple[str, int, ProxyAuth]:
+        return self.host, self.port, self.auth
+
     async def _run(self) -> None:
         self.logger.info("Starting async proxy server...")
         self._semaphore = asyncio.Semaphore(self.max_connections)
@@ -346,7 +357,7 @@ class Proxy:
     async def async_run(self) -> None:
         return await self._run()
 
-    async def _handle_client_request(self, client: StreamReader, writer: StreamWriter) -> None:  # noqa: PLR0915, PLR0912, PLR0914
+    async def _handle_client_request(self, client: StreamReader, writer: StreamWriter) -> None:  # noqa: PLR0915, PLR0912, PLR0914, PLR0911
         PEER_TUPLE_MIN_LEN_FOR_PORT = 2
         async with self._semaphore:  # type: ignore[attr-defined] # noqa: PLR1702, PLR0914
             peer = writer.get_extra_info("peername")
@@ -464,6 +475,17 @@ class Proxy:
                 content_length = get_content_length_from_request(request)
 
                 host, port = extract_host_port_from_request(request)
+
+                if not host or not host.strip():
+                    self.logger.error("Invalid or empty host extracted from request")
+                    writer.write(
+                        ProxyResponse(HTTPStatus.BAD_REQUEST, headers={"Connection": "close"})
+                    )
+                    try:
+                        await asyncio.wait_for(writer.drain(), timeout=self.timeout)
+                    except Exception:
+                        pass
+                    return
 
                 try:
                     dest_reader, dest_writer = await asyncio.wait_for(

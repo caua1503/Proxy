@@ -17,6 +17,7 @@ Recursos principais:
 
 import logging
 from enum import IntEnum
+from typing import Optional
 
 
 class ProxyLogLevel(IntEnum):
@@ -42,10 +43,11 @@ class ProxyLogger:
         ProxyLogLevel.CRITICAL: logging.CRITICAL,
     }
 
-    def __init__(self, level: ProxyLogLevel = ProxyLogLevel.INFO):
-        self.logger = logging.getLogger(__name__)
+    def __init__(self, level: ProxyLogLevel = ProxyLogLevel.INFO, app_name: Optional[str] = None):
         self.level = level
+        self.app_name = app_name
 
+        self.logger = logging.getLogger(self.app_name or "proxy_logger")
         logging.basicConfig(level=logging.NOTSET, format="[%(levelname)s] %(message)s")
 
     def set_level(self, level: ProxyLogLevel) -> None:
@@ -57,6 +59,8 @@ class ProxyLogger:
     def log(self, level: ProxyLogLevel, message: str) -> None:
         if self._should_emit(level):
             logging_level = self._LEVEL_MAPPING[level]
+            if self.app_name:
+                message = f"[{self.app_name}] {message}"
             self.logger.log(logging_level, message)
 
     def info(self, message: str) -> None:
