@@ -4,7 +4,7 @@ from models import ProxyModel
 
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
-from .logger import ProxyLogger
+from .logger import ProxyLogger, ProxyLogLevel
 from .manager import ProxyManager
 from .proxy import Proxy, SyncProxy
 
@@ -17,4 +17,12 @@ try:
 except ImportError:
     pass
 
-__all__ = ["Proxy", "SyncProxy", "ProxyAuth", "ProxyFirewall", "ProxyManager", "ProxyModel"]
+__all__ = [
+    "Proxy",
+    "SyncProxy",
+    "ProxyAuth",
+    "ProxyFirewall",
+    "ProxyManager",
+    "ProxyModel",
+    "ProxyLogLevel",
+]
