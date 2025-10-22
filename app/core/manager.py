@@ -20,6 +20,7 @@ from utils import (
 from .auth import ProxyAuth
 from .firewall import ProxyFirewall
 from .logger import ProxyLogger, ProxyLogLevel
+from .proxy import Proxy
 from .response import ProxyProtocol, ProxyResponse
 
 
@@ -36,8 +37,10 @@ class ProxyManager:
         timeout: int = 15,
         update_timeout: int = 30,
         logger: ProxyLogger = ProxyLogger(),
+        proxy_server: Optional[Proxy] = None,
         extra_config: ProxyManagerConfig = ProxyManagerConfig(),
     ):
+        self.proxy_url = proxy_url
         self.host = host
         self.port = port
         self.debug = debug
@@ -46,7 +49,31 @@ class ProxyManager:
         self.webhook_mode = webhook_mode
         self.timeout = timeout
         self.update_timeout = update_timeout
+        self.proxy_server = proxy_server
         self.logger = logger if not debug else ProxyLogger(level=ProxyLogLevel.DEBUG)
+
+        if self.proxy_server is not None:
+            if not isinstance(self.proxy_server, Proxy):
+                raise TypeError("Erro: 'proxy_server' deve ser uma instância de Proxy ou None.")
+
+            original_logger = self.proxy_server.logger
+            self.proxy_server.logger = ProxyLogger(level=original_logger.level, app_name="Proxy")
+
+            proxy_host, proxy_port, proxy_auth = self.proxy_server.get_info()
+
+            if proxy_host in set({"127.0.0.1", "localhost", "0.0.0.0"}) and proxy_port == self.port:
+                self.logger.warning(
+                    f"Proxy server na porta {proxy_port} não será adicionado como upstream para evitar loop infinito"  # noqa: E501
+                )
+            else:
+                if proxy_auth is not None:
+                    model = ProxyModel(
+                        f"{proxy_auth.username}:{proxy_auth.password}@{proxy_host}:{proxy_port}"
+                    )
+                else:
+                    model = ProxyModel(f"{proxy_host}:{proxy_port}")
+
+                self.proxy_url.append(model)
 
         unique_proxies = []
         seen_urls = set()
@@ -71,10 +98,12 @@ class ProxyManager:
         self.bath_size = extra_config.bath_size
 
         self.proxy_table: dict[str, ProxyTable] = {}
-        asyncio.run(self._get_proxy())
+        # asyncio.run(self._get_proxy())
 
     async def _run(self) -> None:
-        # await asyncio.gather(self._server(), self._update_proxy())
+        if self.proxy_server:
+            asyncio.create_task(self.proxy_server.async_run())
+
         asyncio.create_task(self._update_proxy())
         await self._server()
 
@@ -339,10 +368,10 @@ class ProxyManager:
 
     async def _update_proxy(self) -> None:
         while True:
-            await asyncio.sleep(self.update_timeout)
             await self._get_proxy()
             await self._order_proxy()
             self.logger.debug("Lista de proxy atualizado")
+            await asyncio.sleep(self.update_timeout)
 
     async def _order_proxy(self) -> None:
         """
