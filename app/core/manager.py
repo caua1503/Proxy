@@ -112,7 +112,7 @@ class ProxyManager:
         self.logger.debug(f"Request accepted de {client_host}:{client_port}")
 
         try:
-            request = await asyncio.wait_for(client.readuntil(b"\r\n\r\n"), timeout=self.timeout)
+            request = await asyncio.wait_for(client.readuntil(ProxyProtocol.FINISHED), timeout=self.timeout)
         except Exception:
             self.logger.warning(
                 f"Timeout/erro lendo headers do cliente {client_host}:{client_port}"
@@ -241,6 +241,12 @@ class ProxyManager:
     def _get_proxy_concurrent_table(
         proxy_list: list[ProxyModel],
     ) -> dict[str, ProxyConcurrentTable]:
+        """
+        Final Version {
+        "http://proxy1.com": {"concurrent": 0},
+        "http://proxy2.com": {"concurrent": 0},
+        }
+        """
         return {proxy.url: {"concurrent": 0} for proxy in proxy_list}
 
     async def _health_check(self, proxy: ProxyModel) -> dict[str, float | None, bool]:
