@@ -192,7 +192,7 @@ class SyncProxy:
             host, port = extract_host_port_from_request(request)
 
             if not host or not host.strip():
-                self.logger.error("Invalid or empty host extracted from request")
+                # self.logger.error("Invalid or empty host extracted from request")
                 client.sendall(
                     ProxyResponse(HTTPStatus.BAD_REQUEST, headers={"Connection": "close"})
                 )
@@ -322,7 +322,7 @@ class Proxy:
             )
 
     def get_info(self) -> tuple[str, int, ProxyAuth]:
-        return self.host, self.port, self.auth
+        return "127.0.0.1", self.port, self.auth
 
     async def _run(self) -> None:
         self.logger.info("Starting async proxy server...")
@@ -477,7 +477,7 @@ class Proxy:
                 host, port = extract_host_port_from_request(request)
 
                 if not host or not host.strip():
-                    self.logger.error("Invalid or empty host extracted from request")
+                    # self.logger.error("Invalid or empty host extracted from request")
                     writer.write(
                         ProxyResponse(HTTPStatus.BAD_REQUEST, headers={"Connection": "close"})
                     )
