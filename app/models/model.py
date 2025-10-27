@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional, TypedDict
+from typing import Literal, Optional, TypedDict
+from urllib.parse import urlparse, urlunparse
 
 
 class ProxyConcurrentTable(TypedDict):
@@ -36,15 +37,33 @@ class ProxyModel:
         url (str): Endereço do proxy.
         max_connections (int, optional): Máximo de conexões simultâneas. Padrão é 1000.
         priority (int, optional): Prioridade do proxy (1=alta, 2=media, 3=baixa). Padrão é 2.
+        auth (str, optional): 'user:password'
     """
 
     url: str
     max_connections: int = 1000
     priority: int = 2
+    auth: Optional[str] = None
 
     def __post_init__(self):
         if not self.url.startswith(("http", "https")):
             self.url = f"http://{self.url.lstrip('/')}"
+
+        parsed = urlparse(self.url)
+
+        if parsed.username or parsed.password:
+            user = parsed.username or ""
+            password = parsed.password or ""
+            self.auth = f"{user}:{password}" if password else user
+
+            netloc = parsed.hostname or ""
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            parsed = parsed._replace(netloc=netloc)
+            self.url = urlunparse(parsed)
+
+# type
+TestedModeType = Literal["fast", "accurate"]
 
 
 @dataclass
