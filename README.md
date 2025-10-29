@@ -39,13 +39,14 @@ Este projeto é utilizado por uma aplicação interna: uma rede de proxies conec
 
 ### Tecnologias
 
-- Python (>= 3.13) # Acredito que possa ser compativel com mais versões
+- Python (>= 3.11)
+- Uvloop (Opcional)
 - Sem frameworks adicionais
 
 ### Instalação
 
 1. Clone o repositório
-2. Certifique-se de ter o Python 3.13 instalado
+2. Certifique-se de ter o Python 3.11 instalado
 3. (Opcional) Crie e ative um ambiente virtual
 4. Não há dependências externas a instalar
 

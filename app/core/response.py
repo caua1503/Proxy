@@ -1,59 +1,27 @@
 import json
 from http import HTTPStatus
-from typing import Any, Optional
-
-from typing_extensions import Annotated, Doc, Literal
+from typing import Any, Literal, Optional
 
 
 class ProxyResponse(bytes):
     def __new__(
         cls,
-        status_code: Annotated[
-            int | HTTPStatus,
-            Doc(
-                """
-                HTTP status code to send to the client (int or HTTPStatus).
-                """
-            ),
-        ],
-        body: Annotated[
-            Any | None,
-            Doc(
-                """
-                Response body. Accepts `bytes`, `str` or
-                JSON-serializable (when response_type="JSON").
-                """
-            ),
-        ] = None,
-        headers: Annotated[
-            dict[str, str],
-            Doc(
-                """
-                Optional response headers to include.
-                """
-            ),
-        ] = {},
-        response_type: Annotated[
-            Optional[Literal["JSON", "BYTES", "TEXT"]],
-            Doc(
-                """
-                How to encode the body:
-                "JSON" encodes with application/json;
-                "BYTES" uses raw bytes;
-                "TEXT" encodes str with utf-8 and sets text/plain.
-                Defaults inferred from body type when not provided.
-                """
-            ),
-        ] = None,
-        reason: Annotated[
-            Optional[str],
-            Doc(
-                """
-                Reason phrase to send to the client.
-                """
-            ),
-        ] = None,
+        status_code: int | HTTPStatus,
+        body: Any | None = None,
+        headers: dict[str, str] = {},
+        response_type: Optional[Literal["JSON", "BYTES", "TEXT"]] = None,
+        reason: Optional[str] = None,
     ) -> "ProxyResponse":
+        """
+        Cria objeto ProxyResponse.
+
+        Args:
+            status_code (int | HTTPStatus): Código de status HTTP devolvido ao cliente.
+            body (Any | None): Corpo da resposta: bytes, str ou JSON serializável.
+            headers (dict[str, str]): Cabeçalhos opcionais da resposta.
+            response_type (str | None): "JSON", "BYTES" ou "TEXT". Inferido pelo body se None.
+            reason (str | None): Frase de motivo opcional enviada ao cliente.
+        """
         reason = reason if reason else HTTPStatus(status_code).phrase
 
         default_type = None
@@ -107,6 +75,3 @@ class ProxyProtocol:
 
     def CONNECT_LINE(target: str) -> bytes:
         return (f"CONNECT {target} HTTP/1.1\r\n\r\n").encode()
-
-
-# class Manager
