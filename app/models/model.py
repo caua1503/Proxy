@@ -68,7 +68,8 @@ TestedModeType = Literal["fast", "accurate"]
 
 @dataclass
 class ProxyManagerConfig:
-    target_url: str = "https://api.exemplo.com"
-    timeout_test: int = 60
+    target_url: str = "https://httpbin.org/ip"  # ("https://api.exemplo.com")
+    timeout_test: int = 2
     retries: int = 3
     bath_size: int = 1000
+    test_mode: TestedModeType = "accurate"
