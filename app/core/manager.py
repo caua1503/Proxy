@@ -35,7 +35,7 @@ class ProxyManager:
         firewall: Optional[ProxyFirewall] = None,
         webhook_mode: bool = False,
         timeout: int = 15,
-        update_timeout: int = 30,
+        update_timeout: int = 60,
         logger: ProxyLogger = ProxyLogger(),
         proxy_server: Optional[Proxy] = None,
         extra_config: ProxyManagerConfig = ProxyManagerConfig(),
@@ -50,7 +50,13 @@ class ProxyManager:
         self.timeout = timeout
         self.update_timeout = update_timeout
         self.proxy_server = proxy_server
-        self.logger = logger if not debug else ProxyLogger(level=ProxyLogLevel.DEBUG)
+        self.logger = (
+            logger
+            if not debug
+            else ProxyLogger(
+                level=ProxyLogLevel.DEBUG, app_name="ProxyManager" if proxy_server else None
+            )
+        )
 
         if self.proxy_server is not None:
             if not isinstance(self.proxy_server, Proxy):
@@ -96,6 +102,8 @@ class ProxyManager:
         self.retries = extra_config.target_url
         self.timeout_test = extra_config.timeout_test
         self.bath_size = extra_config.bath_size
+        self.test_mode = extra_config.test_mode
+        self.is_tested = False
 
         self.proxy_table: dict[str, ProxyTable] = {}
         # asyncio.run(self._get_proxy())
@@ -141,7 +149,9 @@ class ProxyManager:
         self.logger.debug(f"Request accepted de {client_host}:{client_port}")
 
         try:
-            request = await asyncio.wait_for(client.readuntil(ProxyProtocol.FINISHED), timeout=self.timeout)
+            request = await asyncio.wait_for(
+                client.readuntil(ProxyProtocol.FINISHED), timeout=self.timeout
+            )
         except Exception:
             self.logger.warning(
                 f"Timeout/erro lendo headers do cliente {client_host}:{client_port}"
@@ -218,7 +228,7 @@ class ProxyManager:
                 pass
             return
 
-        async def pipe(reader, writer):
+        async def pipe(reader: StreamReader, writer: StreamWriter):
             try:
                 while not reader.at_eof():
                     data = await reader.read(4096)
@@ -278,12 +288,18 @@ class ProxyManager:
         """
         return {proxy.url: {"concurrent": 0} for proxy in proxy_list}
 
-    async def _health_check(self, proxy: ProxyModel) -> dict[str, float | None, bool]:
+    async def _health_check(
+        self,
+        proxy: ProxyModel,
+    ) -> dict[str, Optional[float], bool]:
         """
         url, update time (velocidade), ativo ou nao
         """
         start_time = time.perf_counter()
         health = True
+
+        # test_mode = self.test_mode if self.is_tested else "fast"
+
         try:
             parsed = urlparse(proxy.url)
             host = parsed.hostname
@@ -293,7 +309,7 @@ class ProxyManager:
                 asyncio.open_connection(host, port), timeout=self.timeout_test
             )
 
-            latency = round(time.perf_counter() - start_time, 3)
+            latency = round(time.perf_counter() - start_time, 4)
             writer.close()
 
             await writer.wait_closed()
@@ -313,7 +329,10 @@ class ProxyManager:
             self.logger.info("Servidor encerrado")
 
     async def async_run(self) -> None:
-        return await self._run()
+        try:
+            return await self._run()
+        except KeyboardInterrupt:
+            self.logger.info("Servidor encerrado")
 
     async def _get_proxy(self) -> None:
         """
@@ -352,6 +371,8 @@ class ProxyManager:
             results = await asyncio.gather(*health_check_tasks, return_exceptions=True)
             health_proxies += await _process_update_task(results)
 
+        self.is_tested = True
+
         if health_proxies == 0:
             self.logger.warning("Nenhum proxy saudável encontrado.")
         else:
@@ -365,12 +386,23 @@ class ProxyManager:
         """
         async with lock:
             self.proxy_table[proxy_url] = {"latency": health_result["latency"]}
+            # self.logger.debug(f"chamado lock para {proxy_url} - {datetime.datetime.now().strftime("%H:%M:%S.%f")[:-5]}") #noqa: E501
 
     async def _update_proxy(self) -> None:
         while True:
+            start_time = time.perf_counter()
+
             await self._get_proxy()
             await self._order_proxy()
+            self.logger.debug(f"tempo: {round(time.perf_counter() - start_time, 3)}")
             self.logger.debug("Lista de proxy atualizado")
+
+            # for proxy in self.proxy_table:
+            #     self.logger.debug(f"{proxy} - {self.proxy_table[proxy]}")
+
+            for proxy in self.proxy_url:
+                self.logger.debug(f"{proxy.url} - {self.proxy_table[proxy.url]}")
+
             await asyncio.sleep(self.update_timeout)
 
     async def _order_proxy(self) -> None:
