@@ -29,7 +29,7 @@ class ProxyManager:
         self,
         proxy_url: list[ProxyModel],
         host: str = "0.0.0.0",
-        port: int = 8889,
+        port: int | str = 8889,
         debug: bool = False,
         auth: Optional[ProxyAuth] = None,
         firewall: Optional[ProxyFirewall] = None,
@@ -42,7 +42,7 @@ class ProxyManager:
     ):
         self.proxy_url = proxy_url
         self.host = host
-        self.port = port
+        self.port = int(port)
         self.debug = debug
         self.auth = auth
         self.firewall = firewall
