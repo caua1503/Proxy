@@ -1,4 +1,5 @@
 import asyncio
+import datetime  # noqa: F401
 import time
 from asyncio.streams import StreamReader, StreamWriter
 from collections import defaultdict
@@ -109,11 +110,18 @@ class ProxyManager:
         # asyncio.run(self._get_proxy())
 
     async def _run(self) -> None:
-        if self.proxy_server:
-            asyncio.create_task(self.proxy_server.async_run())
+        try:
+            async with asyncio.TaskGroup() as tg:
+                if self.proxy_server:
+                    tg.create_task(self.proxy_server.async_run())
+                    await asyncio.sleep(0.1)  # opcional: tempo para iniciar proxy
 
-        asyncio.create_task(self._update_proxy())
-        await self._server()
+                tg.create_task(self._update_proxy())
+
+                await self._server()
+
+        except Exception as e:
+            self.logger.error(f"erro {e}")
 
     async def _server(self):
         self.logger.info("Starting ProxyManager")
