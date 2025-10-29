@@ -62,6 +62,7 @@ class ProxyModel:
             parsed = parsed._replace(netloc=netloc)
             self.url = urlunparse(parsed)
 
+
 # type
 TestedModeType = Literal["fast", "accurate"]
 
