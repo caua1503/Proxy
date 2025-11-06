@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY ./ ./
 
-RUN pip install --no-cache-dir uv uvloop
+RUN pip install --no-cache-dir uv 
+RUN uv venv && uv add uvloop
 
 EXPOSE 8888
 
