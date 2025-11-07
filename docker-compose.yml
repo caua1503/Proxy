@@ -1,11 +1,23 @@
 version: "3"
 services:
-  proxy-app:
+  # proxy-app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.app
+  #   ports:
+  #     - "8888:8888"
+  #   restart: always
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "0.5"
+  #         memory: 128M
+  proxy-manager:
     build:
       context: .
-      dockerfile: Dockerfile.app
+      dockerfile: Dockerfile.manager
     ports:
-      - "8888:8888"
+      - "8889:8889"
     restart: always
     deploy:
       resources:
