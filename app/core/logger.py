@@ -48,7 +48,12 @@ class ProxyLogger:
         self.app_name = app_name
 
         self.logger = logging.getLogger(self.app_name or "proxy_logger")
-        logging.basicConfig(level=logging.NOTSET, format="[%(levelname)s] %(message)s")
+        if not self.logger.hasHandlers():
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter("[%(levelname)s] %(message)s")
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+        self.logger.setLevel(self._LEVEL_MAPPING[self.level])
 
     def set_level(self, level: ProxyLogLevel) -> None:
         self.level = level
