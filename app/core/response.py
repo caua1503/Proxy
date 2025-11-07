@@ -7,7 +7,7 @@ class ProxyResponse(bytes):
     def __new__(
         cls,
         status_code: int | HTTPStatus,
-        body: Any | None = None,
+        body: Optional[Any] = None,
         headers: dict[str, str] = {},
         response_type: Optional[Literal["JSON", "BYTES", "TEXT"]] = None,
         reason: Optional[str] = None,
