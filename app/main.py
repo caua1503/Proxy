@@ -4,6 +4,6 @@ from core import Proxy
 
 # firewall = ProxyFirewall()
 
-proxy = Proxy(debug=True)
+proxy = Proxy()
 
 proxy.run()
