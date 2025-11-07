@@ -1,4 +1,11 @@
-from .model import ProxyConcurrentTable, ProxyManagerConfig, ProxyModel, ProxyTable, TestedModeType
+from .model import (
+    ProxyConcurrentTable,
+    ProxyManagerConfig,
+    ProxyModel,
+    ProxyModeType,
+    ProxyTable,
+    TestedModeType,
+)
 
 __all__ = [
     "ProxyConcurrentTable",
@@ -6,4 +13,5 @@ __all__ = [
     "ProxyModel",
     "ProxyTable",
     "TestedModeType",
+    "ProxyModeType",
 ]
