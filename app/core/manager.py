@@ -354,13 +354,14 @@ class ProxyManager:
                 if isinstance(result, Exception):
                     self.logger.warning(f"Erro no health check: {result}")
                     continue
+                if result.get("health") is True:
+                    health_proxies += 1
 
                 proxy_url = result["url"]
                 lock = self.locks[proxy_url]
                 update_tasks.append(
                     asyncio.create_task(self._update_proxy_table_entry(lock, proxy_url, result))
                 )
-                health_proxies += 1
 
             await asyncio.gather(*update_tasks)
             return health_proxies
