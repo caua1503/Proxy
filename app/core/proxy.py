@@ -320,13 +320,13 @@ class Proxy:
             self.logger.warning(
                 f"The backlog ({self.backlog}) cannot be smaller than max connections ({self.max_connections})"  # noqa: E501
             )
+        self._semaphore = asyncio.Semaphore(self.max_connections)
 
     def get_info(self) -> tuple[str, int, ProxyAuth]:
         return "127.0.0.1", self.port, self.auth
 
     async def _run(self) -> None:
         self.logger.info("Starting async proxy server...")
-        self._semaphore = asyncio.Semaphore(self.max_connections)
 
         try:
             server = await asyncio.start_server(
